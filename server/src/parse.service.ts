@@ -90,6 +90,13 @@ export class ParseService {
 
         // 判断是否为短视频平台
         if (sourceType === 'video') {
+          // 短视频平台：先解析短链接
+          const realUrl = await this.resolveShortUrl(url)
+          if (realUrl && realUrl !== url) {
+            console.log(`[Parse] 短链接已解析: ${url} -> ${realUrl}`)
+            url = realUrl
+          }
+
           // 短视频平台：优先用 GPU 服务提取字幕
           const subtitleResult = await this.extractVideoSubtitle(url)
           
@@ -226,6 +233,13 @@ export class ParseService {
       // 根据来源类型获取内容
       if (sourceUrl) {
         if (sourceType === 'video') {
+          // 视频类型：先解析短链接
+          const realUrl = await this.resolveShortUrl(sourceUrl)
+          if (realUrl && realUrl !== sourceUrl) {
+            console.log(`[Parse] previewMultiple 短链接已解析: ${sourceUrl} -> ${realUrl}`)
+            sourceUrl = realUrl
+          }
+
           // 视频类型：提取字幕
           const subtitleResult = await this.extractVideoSubtitle(sourceUrl)
           
@@ -510,7 +524,7 @@ export class ParseService {
     }
   }
 
-  // 解析短链接为真实 URL
+  // 解析短链接为真实 URL（使用 curl 确保正确跟随重定向）
   private async resolveShortUrl(shortUrl: string): Promise<string | null> {
     try {
       // 如果不是短链，直接返回原 URL
@@ -518,27 +532,31 @@ export class ParseService {
         return shortUrl
       }
 
-      console.log(`[Parse] 解析短链: ${shortUrl}`)
+      console.log(`[Parse] 使用 curl 解析短链: ${shortUrl}`)
 
-      // 使用 fetch 跟随重定向获取真实地址
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      // 使用 curl 获取最终的 Location 头（使用 GET 而非 HEAD，因为服务器对 HEAD 返回 404）
+      const cmd = `curl -s -L -w "\\n%{url_effective}" -o /dev/null "${shortUrl}" 2>&1 | tail -1`
+      const output = execSync(cmd, { stdio: 'pipe', shell: '/bin/bash', timeout: 15000 }).toString().trim()
 
-      const response = await fetch(shortUrl, {
-        method: 'HEAD',
-        redirect: 'follow',
-        signal: controller.signal,
-      })
+      if (output && output.startsWith('http')) {
+        console.log(`[Parse] 短链解析成功: ${shortUrl} -> ${output}`)
+        return output
+      }
 
-      clearTimeout(timeoutId)
+      // 备选方案：使用 curl -v 获取 Location
+      const cmd2 = `curl -v -L "${shortUrl}" 2>&1 | grep "< Location" | tail -1 | sed 's/< Location: //' | tr -d '\\r'`
+      const output2 = execSync(cmd2, { stdio: 'pipe', shell: '/bin/bash', timeout: 15000 }).toString().trim()
 
-      const realUrl = response.url
-      console.log(`[Parse] 短链解析结果: ${realUrl}`)
+      if (output2 && output2.startsWith('http')) {
+        console.log(`[Parse] 短链解析成功(备选): ${shortUrl} -> ${output2}`)
+        return output2
+      }
 
-      return realUrl
+      console.log(`[Parse] 短链解析失败，未获取到有效 URL`)
+      return shortUrl
     } catch (error: any) {
-      console.error(`[Parse] 短链解析失败: ${error.message}`)
-      // 降级：返回原始 URL，让 yt-dlp 尝试处理
+      console.error(`[Parse] 短链解析异常: ${error.message}`)
+      // 降级：返回原始 URL，让后续流程尝试处理
       return shortUrl
     }
   }
