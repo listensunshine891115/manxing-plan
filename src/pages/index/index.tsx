@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card } from '@/components/ui/card'
+import { Dialog } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { 
   Sparkles, MapPin, Calendar, ChevronRight, 
-  Check, User, Settings, MessageCircle
+  Check, User, Settings, Link2
 } from 'lucide-react-taro'
 import { Inspiration } from '@/types'
 import { Network } from '@/network'
@@ -40,6 +42,11 @@ export default function Index() {
     user_code: string
     wx_openid: string
   } | null>(null)
+
+  // 粘贴链接弹窗
+  const [showPasteDialog, setShowPasteDialog] = useState(false)
+  const [linkInput, setLinkInput] = useState('')
+  const [pasting, setPasting] = useState(false)
 
   // 检查登录状态
   const checkLogin = async () => {
@@ -119,6 +126,60 @@ export default function Index() {
   // 跳转到设置页面
   const goToSettings = () => {
     Taro.navigateTo({ url: '/pages/settings/index' })
+  }
+
+  // 粘贴链接收录
+  const handlePasteLink = async () => {
+    if (!linkInput.trim()) {
+      Taro.showToast({ title: '请输入链接', icon: 'none' })
+      return
+    }
+
+    if (!linkInput.includes('http')) {
+      Taro.showToast({ title: '请输入有效的链接', icon: 'none' })
+      return
+    }
+
+    setPasting(true)
+    try {
+      const res = await Network.request({
+        url: '/api/trip/add-inspiration',
+        method: 'POST',
+        data: {
+          userId: userInfo?.id,
+          url: linkInput.trim()
+        }
+      })
+      
+      if (res.data?.success) {
+        Taro.showToast({ title: '收录成功', icon: 'success' })
+        setLinkInput('')
+        setShowPasteDialog(false)
+        fetchInspirations()
+      } else {
+        Taro.showToast({ title: res.data?.message || '收录失败', icon: 'none' })
+      }
+    } catch (error) {
+      console.error('收录失败:', error)
+      Taro.showToast({ title: '收录失败', icon: 'none' })
+    } finally {
+      setPasting(false)
+    }
+  }
+
+  // 粘贴剪贴板
+  const handlePasteFromClipboard = async () => {
+    try {
+      const res = await Taro.getClipboardData()
+      if (res.data) {
+        setLinkInput(res.data)
+        Taro.showToast({ title: '已粘贴', icon: 'success' })
+      } else {
+        Taro.showToast({ title: '剪贴板为空', icon: 'none' })
+      }
+    } catch {
+      Taro.showToast({ title: '粘贴失败', icon: 'none' })
+    }
   }
 
   // 切换选中
@@ -205,7 +266,7 @@ export default function Index() {
                 </>
               ) : (
                 <>
-                  <MessageCircle size={12} color="#d97706" />
+                  <Check size={12} color="#d97706" />
                   <Text>未绑定</Text>
                 </>
               )}
@@ -223,17 +284,31 @@ export default function Index() {
 
       {/* 快捷入口 */}
       <View className="px-4 py-4">
-        <View className="bg-white rounded-xl p-4 flex items-center gap-3"
-          onClick={() => window.location.href = '/pages/generate/index'}
-        >
-          <View className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-            <Calendar size={20} color="#3b82f6" />
+        <View className="flex gap-3">
+          <View 
+            className="flex-1 bg-white rounded-xl p-4 flex items-center gap-3"
+            onClick={() => window.location.href = '/pages/generate/index'}
+          >
+            <View className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+              <Calendar size={20} color="#3b82f6" />
+            </View>
+            <View className="flex-1">
+              <Text className="block text-sm font-medium text-gray-900">出行设置</Text>
+              <Text className="block text-xs text-gray-400">设置行程</Text>
+            </View>
           </View>
-          <View className="flex-1">
-            <Text className="block text-sm font-medium text-gray-900">出行设置</Text>
-            <Text className="block text-xs text-gray-400">设置行程日期和偏好</Text>
+          <View 
+            className="flex-1 bg-white rounded-xl p-4 flex items-center gap-3"
+            onClick={() => setShowPasteDialog(true)}
+          >
+            <View className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+              <Link2 size={20} color="#10b981" />
+            </View>
+            <View className="flex-1">
+              <Text className="block text-sm font-medium text-gray-900">粘贴链接</Text>
+              <Text className="block text-xs text-gray-400">收录灵感</Text>
+            </View>
           </View>
-          <ChevronRight size={18} color="#9ca3af" />
         </View>
       </View>
 
@@ -313,10 +388,11 @@ export default function Index() {
           </View>
           <Text className="block text-base font-medium text-gray-900 mb-2">暂无灵感</Text>
           <Text className="block text-sm text-gray-400 text-center px-8 mb-4">
-            去设置页绑定公众号{'\n'}或发送链接给公众号自动收录
+            点击「粘贴链接」收录灵感
           </Text>
-          <Button className="bg-blue-500" onClick={goToSettings}>
-            <Text className="text-white">去设置</Text>
+          <Button className="bg-blue-500" onClick={() => setShowPasteDialog(true)}>
+            <Link2 size={16} color="#fff" />
+            <Text className="text-white ml-2">粘贴链接</Text>
           </Button>
         </View>
       )}
@@ -337,6 +413,43 @@ export default function Index() {
           </View>
         </View>
       )}
+
+      {/* 粘贴链接弹窗 */}
+      <Dialog open={showPasteDialog} onOpenChange={(open) => !open && setShowPasteDialog(false)}>
+        <View className="p-6">
+          <View className="text-center mb-4">
+            <View className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Link2 size={24} color="#10b981" />
+            </View>
+            <Text className="block text-lg font-medium text-gray-900">粘贴链接</Text>
+          </View>
+          <View className="bg-gray-50 rounded-xl p-4 mb-4">
+            <View className="mb-3">
+              <Input 
+                className="w-full bg-white"
+                placeholder="粘贴分享链接..."
+                value={linkInput}
+                onInput={(e: any) => setLinkInput(e.target.value)}
+              />
+            </View>
+            <View className="flex gap-2">
+              <Button 
+                className="flex-1 bg-white border border-gray-200"
+                onClick={handlePasteFromClipboard}
+              >
+                <Text className="text-blue-600">粘贴</Text>
+              </Button>
+              <Button 
+                className="flex-1 bg-blue-500"
+                onClick={handlePasteLink}
+                disabled={pasting}
+              >
+                <Text className="text-white">{pasting ? '收录中...' : '收录'}</Text>
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Dialog>
     </View>
   )
 }
