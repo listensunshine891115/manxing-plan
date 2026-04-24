@@ -5,6 +5,7 @@ import { AsrService } from './asr.service'
 import { AudioService } from './audio.service'
 import { VideoParseService } from './video-parse.service'
 import { execSync } from 'child_process'
+import playwright from 'playwright'
 
 // 类型映射：中文 -> 中文一级标签
 const primaryTagMap: Record<string, string> = {
@@ -567,6 +568,7 @@ export class ParseService {
     content?: string
     title?: string
     coverImage?: string
+    imageUrls?: string[]
     message?: string
   }> {
     try {
@@ -586,7 +588,17 @@ export class ParseService {
         }
       }
       
+      // 判断是否为微信公众号文章
+      const isWeChatArticle = realUrl.includes('mp.weixin.qq.com')
+      
+      // 微信公众号文章使用原生 HTTP 获取
+      if (isWeChatArticle) {
+        return await this.fetchWeChatArticle(realUrl)
+      }
+      
+      // 其他网站使用 fetchClient
       const response = await this.fetchClient.fetch(realUrl)
+      console.log(`[Parse] fetchClient.fetch 结果:`, JSON.stringify(response).slice(0, 500))
 
       if (response.status_code !== 0) {
         return {
@@ -608,16 +620,144 @@ export class ParseService {
       if (firstImage?.image?.display_url) {
         coverImage = firstImage.image.display_url
       }
+      
+      // 提取所有图片 URL
+      const imageUrls: string[] = response.content
+        .filter(item => item.type === 'image' && item.image?.display_url)
+        .map(item => item.image!.display_url as string)
 
       return {
         success: true,
         content: textContent,
         title: response.title || '',
-        coverImage
+        coverImage,
+        imageUrls
       }
     } catch (error: any) {
       console.error(`[Parse] Fetch 失败:`, error)
       return { success: false, message: `获取页面失败: ${error.message}` }
+    }
+  }
+  
+  // 专门获取微信公众号文章内容（使用 Playwright 渲染）
+  private async fetchWeChatArticle(url: string): Promise<{
+    success: boolean
+    content?: string
+    title?: string
+    coverImage?: string
+    imageUrls?: string[]
+    message?: string
+  }> {
+    let browser: playwright.Browser | null = null
+    try {
+      console.log(`[Parse] 微信公众号文章，使用 Playwright 渲染获取: ${url}`)
+      
+      // 使用 Playwright 启动无头浏览器
+      browser = await playwright.chromium.launch({ 
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      })
+      const page = await browser.newPage()
+      
+      // 设置视口和用户代理
+      await page.setViewportSize({ width: 375, height: 812 })
+      await page.setExtraHTTPHeaders({
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
+      })
+      
+      // 访问页面并等待内容加载
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 20000 })
+      
+      // 等待正文内容加载
+      await page.waitForSelector('#js_content', { timeout: 10000 }).catch(() => {
+        console.log(`[Parse] 等待 #js_content 超时，继续尝试获取内容`)
+      })
+      
+      // 获取标题
+      const title = await page.title()
+      console.log(`[Parse] 公众号文章标题: ${title}`)
+      
+      // 获取正文内容
+      const content = await page.evaluate(() => {
+        const contentEl = document.getElementById('js_content')
+        if (!contentEl) return ''
+        
+        // 获取纯文本内容
+        let text = contentEl.innerText || contentEl.textContent || ''
+        
+        // 清理文本
+        text = text.replace(/\s+/g, ' ').trim()
+        
+        // 限制长度
+        if (text.length > 5000) {
+          text = text.slice(0, 5000)
+        }
+        
+        return text
+      })
+      
+      console.log(`[Parse] 公众号文章正文长度: ${content.length}`)
+      
+      // 获取所有图片 URL
+      const imageUrls = await page.evaluate(() => {
+        const contentEl = document.getElementById('js_content')
+        if (!contentEl) return []
+        
+        const images = contentEl.querySelectorAll('img')
+        const urls: string[] = []
+        
+        images.forEach((img) => {
+          // 优先使用 data-src（懒加载图片）
+          let src = img.getAttribute('data-src') || img.src || ''
+          
+          // 过滤掉表情包等小图（通常包含 qpic.cn 的很小）
+          if (src && !src.includes('qpic.cn')) {
+            urls.push(src)
+          }
+        })
+        
+        return urls
+      })
+      
+      console.log(`[Parse] 公众号文章图片数量: ${imageUrls.length}`)
+      
+      // 获取封面图
+      const coverImage = await page.evaluate(() => {
+        // 尝试从 meta 标签获取 og:image
+        const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute('content')
+        if (ogImage) return ogImage
+        
+        // 或者从第一个大图获取
+        const contentEl = document.getElementById('js_content')
+        if (contentEl) {
+          const firstImg = contentEl.querySelector('img')
+          if (firstImg) {
+            return firstImg.getAttribute('data-src') || firstImg.src || ''
+          }
+        }
+        
+        return ''
+      })
+      
+      if (!content) {
+        return { success: false, message: '无法提取文章正文内容' }
+      }
+      
+      return {
+        success: true,
+        content,
+        title,
+        coverImage,
+        imageUrls
+      }
+    } catch (error: any) {
+      console.error(`[Parse] 微信公众号 Playwright 获取失败:`, error.message)
+      return { success: false, message: `获取公众号文章失败: ${error.message}` }
+    } finally {
+      // 确保浏览器被关闭
+      if (browser) {
+        await browser.close().catch(() => {})
+      }
     }
   }
 
