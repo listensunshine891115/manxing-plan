@@ -28,7 +28,6 @@ export default function Index() {
   const [inspirations, setInspirations] = useState<Inspiration[]>([])
   const [loading, setLoading] = useState(true)
   const [showShareSheet, setShowShareSheet] = useState(false)
-  const [sharedContent, setSharedContent] = useState<{ url: string; title: string; image?: string } | null>(null)
 
   // 加载灵感列表
   const fetchInspirations = async () => {
@@ -51,25 +50,33 @@ export default function Index() {
     fetchInspirations()
   }, [])
 
-  // 处理分享内容
-  const handleShare = (content: { url: string; title: string; image?: string }) => {
-    setSharedContent(content)
+  // 打开添加弹窗
+  const handleOpenAdd = () => {
     setShowShareSheet(true)
   }
 
-  // 收藏到灵感池
-  const handleCollect = async () => {
-    if (!sharedContent) return
-    
+  // 收藏灵感
+  const handleCollect = async (data: { url: string; title: string; type?: 'spot' | 'food' | 'show' | 'hotel' }) => {
     try {
+      // 根据URL判断来源
+      let source = 'other'
+      const url = data.url.toLowerCase()
+      if (url.includes('xiaohongshu') || url.includes('xhs')) {
+        source = 'xiaohongshu'
+      } else if (url.includes('dianping') || url.includes('大众点评')) {
+        source = 'dazhong'
+      } else if (url.includes('damai') || url.includes('大麦')) {
+        source = 'damai'
+      }
+
       const res = await Network.request({
         url: '/api/trip/inspirations',
         method: 'POST',
         data: {
-          title: sharedContent.title,
-          image: sharedContent.image || '',
-          source: 'other',
-          type: 'spot'
+          title: data.title,
+          image: '',
+          source,
+          type: data.type || 'spot'
         }
       })
       console.log('[POST] /api/trip/inspirations - Response:', JSON.stringify(res.data))
@@ -77,8 +84,6 @@ export default function Index() {
       if (res.data?.data) {
         setInspirations(prev => [res.data.data, ...prev])
       }
-      setShowShareSheet(false)
-      setSharedContent(null)
     } catch (error) {
       console.error('收藏失败:', error)
     }
@@ -116,7 +121,7 @@ export default function Index() {
           <Button 
             variant="ghost" 
             size="icon"
-            onClick={() => handleShare({ url: '', title: '添加灵感' })}
+            onClick={handleOpenAdd}
           >
             <Plus size={24} color="#3B82F6" />
           </Button>
@@ -224,7 +229,6 @@ export default function Index() {
       <ShareSheet
         open={showShareSheet}
         onClose={() => setShowShareSheet(false)}
-        content={sharedContent}
         onCollect={handleCollect}
       />
     </View>
