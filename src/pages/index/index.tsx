@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { 
   Sparkles, MapPin, Calendar, Check, User, Settings, Link2,
-  X, ChevronRight, Trash2, Plus, Heart
+  X, ChevronRight, Trash2, Plus, Heart, Clock, Footprints
 } from 'lucide-react-taro'
 import { Network } from '@/network'
 import { primaryTagConfig, secondaryTagConfig } from './config'
@@ -42,6 +42,9 @@ export default function Index() {
   // 粘贴链接
   const [linkInput, setLinkInput] = useState('')
   const [pasting, setPasting] = useState(false)
+
+  // 行程列表
+  const [trips, setTrips] = useState<any[]>([])
 
   // 预览灵感点弹窗
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
@@ -86,14 +89,36 @@ export default function Index() {
     }
   }
 
+  // 加载行程列表
+  const fetchTrips = async () => {
+    const user = await checkLogin()
+    const userId = user?.id
+
+    if (!userId) return
+
+    try {
+      const res = await Network.request({
+        url: '/api/trip/trips',
+        data: { userId }
+      })
+      console.log('[GET] /api/trip/trips - Response:', res.data)
+      if (res.data?.data) {
+        setTrips(res.data.data)
+      }
+    } catch (error) {
+      console.error('获取行程失败:', error)
+    }
+  }
+
   useEffect(() => {
     fetchInspirations()
+    fetchTrips()
   }, [])
 
   // 下拉刷新
   const onRefresh = async () => {
     setRefreshing(true)
-    await fetchInspirations()
+    await Promise.all([fetchInspirations(), fetchTrips()])
     setRefreshing(false)
     Taro.showToast({ title: '刷新成功', icon: 'success' })
   }
@@ -421,6 +446,54 @@ export default function Index() {
             一键粘贴剪贴板内容
           </Text>
         </View>
+
+        {/* 我的漫游计划 */}
+        {trips.length > 0 && (
+          <View className="mt-4">
+            <View className="flex items-center justify-between mb-3">
+              <View className="flex items-center">
+                <Footprints size={16} color="#3b82f6" />
+                <Text className="block text-base font-semibold text-gray-900 ml-2">我的漫游计划</Text>
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {trips.length} 个
+                </Badge>
+              </View>
+            </View>
+            <View className="space-y-3">
+              {trips.slice(0, 3).map((trip) => (
+                <View 
+                  key={trip.id}
+                  className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100"
+                  onClick={() => {
+                    // 查看行程详情
+                    Taro.setStorage({ key: 'currentTrip', data: trip })
+                    Taro.navigateTo({ url: '/pages/confirm/index' })
+                  }}
+                >
+                  <View className="flex items-center justify-between">
+                    <View className="flex items-center">
+                      <Calendar size={14} color="#3b82f6" />
+                      <Text className="block text-sm font-medium text-gray-900 ml-2">
+                        {trip.version_name || '我的行程'}
+                      </Text>
+                    </View>
+                    <View className="flex items-center text-xs text-gray-500">
+                      <Clock size={12} color="#9ca3af" />
+                      <Text className="ml-1">
+                        {trip.settings?.days || 1}天行程
+                      </Text>
+                    </View>
+                  </View>
+                  {trip.settings?.startDate && (
+                    <Text className="block text-xs text-gray-500 mt-1 ml-5">
+                      {trip.settings.startDate}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* 我的灵感点 */}
         <View className="flex items-center justify-between">
