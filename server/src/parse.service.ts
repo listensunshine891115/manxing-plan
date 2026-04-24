@@ -513,28 +513,33 @@ export class ParseService {
   // 解析短链接为真实 URL
   private async resolveShortUrl(shortUrl: string): Promise<string | null> {
     try {
-      // 使用 FetchClient 访问短链接，它会自动跟随重定向
-      const response = await this.fetchClient.fetch(shortUrl)
-      
-      // 如果成功返回内容，检查是否有重定向后的 URL
-      if (response.status_code === 0 && response.content) {
-        // 从返回的内容中提取真实 URL
-        const textContent = response.content
-          .filter(item => item.type === 'text')
-          .map(item => item.text)
-          .join('\n')
-        
-        // 如果文本中包含 xiaohongshu.com 的 URL，说明已经解析成功
-        const match = textContent.match(/https?:\/\/(?:www\.)?xiaohongshu\.com[^\s<>"\]]+/)
-        if (match) {
-          return match[0].split('?')[0] // 去掉查询参数
-        }
+      // 如果不是短链，直接返回原 URL
+      if (!/xhslink\.com|b23\.tv|v\.douyin\.com/i.test(shortUrl)) {
+        return shortUrl
       }
-      
-      return null
+
+      console.log(`[Parse] 解析短链: ${shortUrl}`)
+
+      // 使用 fetch 跟随重定向获取真实地址
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+      const response = await fetch(shortUrl, {
+        method: 'HEAD',
+        redirect: 'follow',
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      const realUrl = response.url
+      console.log(`[Parse] 短链解析结果: ${realUrl}`)
+
+      return realUrl
     } catch (error: any) {
-      console.error(`[Parse] 短链接解析失败: ${error.message}`)
-      return null
+      console.error(`[Parse] 短链解析失败: ${error.message}`)
+      // 降级：返回原始 URL，让 yt-dlp 尝试处理
+      return shortUrl
     }
   }
 
