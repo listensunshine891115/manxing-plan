@@ -84,11 +84,13 @@ export default function Generate() {
   // 计算行程天数
   const tripDays = differenceInDays(endDate, startDate) + 1
 
-  // 时间选项（每小时）
-  const timeOptions = Array.from({ length: 24 }, (_, i) => ({
-    value: `${i.toString().padStart(2, '0')}:00`,
-    label: `${i.toString().padStart(2, '0')}:00`
-  }))
+  // 时间选项（每10分钟）
+  const timeOptions = Array.from({ length: 144 }, (_, i) => {
+    const hours = Math.floor(i / 6)
+    const minutes = (i % 6) * 10
+    const value = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+    return { value, label: value }
+  })
 
   // 邀请同伴
   const [inviteCompanion, setInviteCompanion] = useState(false)
@@ -267,10 +269,10 @@ export default function Generate() {
     }
   }
 
-  // 渲染日期时间选择弹窗
-  const renderDateTimePickers = () => (
+  // 渲染日期选择弹窗（仅选择日期，时间在主界面选择）
+  const renderDatePickers = () => (
     <>
-      {/* 起始日期时间选择 */}
+      {/* 起始日期选择 */}
       {showStartPicker && (
         <View className="calendar-overlay" onClick={() => setShowStartPicker(false)}>
           <View className="calendar-container" onClick={e => e.stopPropagation()}>
@@ -283,40 +285,16 @@ export default function Generate() {
                   if (date > endDate) {
                     setEndDate(addDays(date, 0))
                   }
+                  setShowStartPicker(false)
                 }
               }}
               disabled={(date) => date < new Date()}
             />
-            {/* 时间选择 */}
-            <View className="p-4 border-t border-gray-100">
-              <Text className="block text-sm text-gray-600 mb-2">集合时间</Text>
-              <View className="flex gap-2">
-                <View className="flex-1">
-                  <Picker
-                    mode="selector"
-                    range={timeOptions}
-                    rangeKey="label"
-                    value={timeOptions.findIndex(t => t.value === startTime)}
-                    onChange={(e: any) => setStartTime(timeOptions[e.detail.value].value)}
-                  >
-                    <View className="px-4 py-3 bg-gray-50 rounded-lg text-center">
-                      <Text className="block text-sm text-gray-900">{startTime}</Text>
-                    </View>
-                  </Picker>
-                </View>
-              </View>
-            </View>
-            {/* 确认按钮 */}
-            <View className="p-4 border-t border-gray-100">
-              <Button className="w-full" onClick={() => setShowStartPicker(false)}>
-                确定
-              </Button>
-            </View>
           </View>
         </View>
       )}
 
-      {/* 结束日期时间选择 */}
+      {/* 结束日期选择 */}
       {showEndPicker && (
         <View className="calendar-overlay" onClick={() => setShowEndPicker(false)}>
           <View className="calendar-container" onClick={e => e.stopPropagation()}>
@@ -327,6 +305,7 @@ export default function Generate() {
                 if (date) {
                   if (date >= startDate) {
                     setEndDate(date)
+                    setShowEndPicker(false)
                   } else {
                     Taro.showToast({ title: '结束日期不能早于起始日期', icon: 'none' })
                   }
@@ -334,31 +313,6 @@ export default function Generate() {
               }}
               disabled={(date) => date < startDate}
             />
-            {/* 时间选择 */}
-            <View className="p-4 border-t border-gray-100">
-              <Text className="block text-sm text-gray-600 mb-2">结束时间</Text>
-              <View className="flex gap-2">
-                <View className="flex-1">
-                  <Picker
-                    mode="selector"
-                    range={timeOptions}
-                    rangeKey="label"
-                    value={timeOptions.findIndex(t => t.value === endTime)}
-                    onChange={(e: any) => setEndTime(timeOptions[e.detail.value].value)}
-                  >
-                    <View className="px-4 py-3 bg-gray-50 rounded-lg text-center">
-                      <Text className="block text-sm text-gray-900">{endTime}</Text>
-                    </View>
-                  </Picker>
-                </View>
-              </View>
-            </View>
-            {/* 确认按钮 */}
-            <View className="p-4 border-t border-gray-100">
-              <Button className="w-full" onClick={() => setShowEndPicker(false)}>
-                确定
-              </Button>
-            </View>
           </View>
         </View>
       )}
@@ -436,13 +390,28 @@ export default function Generate() {
           </View>
           <Button 
             variant="outline" 
-            className="w-full justify-start h-11 border-gray-200"
+            className="w-full justify-start h-11 border-gray-200 mb-3"
             onClick={() => setShowStartPicker(true)}
           >
             <Text className="block text-sm text-gray-700">
-              {format(startDate, 'yyyy年MM月dd日')} {startTime}
+              {format(startDate, 'yyyy年MM月dd日')}
             </Text>
           </Button>
+          {/* 时间选择 */}
+          <View className="flex items-center">
+            <Text className="block text-xs text-gray-500 mr-2">集合时间</Text>
+            <Picker
+              mode="selector"
+              range={timeOptions}
+              rangeKey="label"
+              value={timeOptions.findIndex(t => t.value === startTime)}
+              onChange={(e: any) => setStartTime(timeOptions[e.detail.value].value)}
+            >
+              <View className="px-4 py-2 bg-gray-50 rounded-lg">
+                <Text className="block text-sm text-gray-900">{startTime}</Text>
+              </View>
+            </Picker>
+          </View>
         </View>
 
         {/* 结束时间 */}
@@ -456,13 +425,28 @@ export default function Generate() {
           </View>
           <Button 
             variant="outline" 
-            className="w-full justify-start h-11 border-gray-200"
+            className="w-full justify-start h-11 border-gray-200 mb-3"
             onClick={() => setShowEndPicker(true)}
           >
             <Text className="block text-sm text-gray-700">
-              {format(endDate, 'yyyy年MM月dd日')} {endTime}
+              {format(endDate, 'yyyy年MM月dd日')}
             </Text>
           </Button>
+          {/* 时间选择 */}
+          <View className="flex items-center">
+            <Text className="block text-xs text-gray-500 mr-2">返程时间</Text>
+            <Picker
+              mode="selector"
+              range={timeOptions}
+              rangeKey="label"
+              value={timeOptions.findIndex(t => t.value === endTime)}
+              onChange={(e: any) => setEndTime(timeOptions[e.detail.value].value)}
+            >
+              <View className="px-4 py-2 bg-gray-50 rounded-lg">
+                <Text className="block text-sm text-gray-900">{endTime}</Text>
+              </View>
+            </Picker>
+          </View>
         </View>
 
         {/* 出行方式 */}
@@ -659,7 +643,7 @@ export default function Generate() {
       </View>
 
       {/* 日历弹窗 */}
-      {renderDateTimePickers()}
+      {renderDatePickers()}
     </View>
   )
 }
