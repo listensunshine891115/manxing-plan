@@ -83,6 +83,23 @@ export class TripService {
     return result
   }
 
+  // 获取灵感详情
+  async getInspirationById(id: string) {
+    const { data, error } = await this.client
+      .from('inspirations')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (error) {
+      console.error(`[TripService] 获取灵感详情失败 (id: ${id}):`, JSON.stringify(error))
+      return null
+    }
+    
+    console.log(`[TripService] 获取灵感详情 (id: ${id}):`, JSON.stringify(data))
+    return data
+  }
+
   // 添加灵感
   async addInspiration(input: InspirationInput) {
     const { data, error } = await this.client

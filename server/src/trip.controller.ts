@@ -27,6 +27,14 @@ export class TripController {
     return { code: 200, msg: 'success', data }
   }
 
+  // 获取灵感详情
+  @Get('inspirations/:id')
+  async getInspirationById(@Param('id') id: string) {
+    console.log(`[GET] /api/trip/inspirations/${id}`)
+    const data = await this.tripService.getInspirationById(id)
+    return { code: 200, msg: 'success', data }
+  }
+
   // 添加灵感（支持链接解析和文字输入）
   @Post('inspirations')
   async addInspiration(@Body() body: { userId?: string; url?: string; text?: string }) {
