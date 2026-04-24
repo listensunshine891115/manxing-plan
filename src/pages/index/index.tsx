@@ -29,6 +29,20 @@ const sourceConfig: Record<string, { color: string; label: string }> = {
   other: { color: '#64748B', label: '其他' }
 }
 
+// 灵感点类型
+interface InspirationPoint {
+  name: string
+  location: string
+  time: string
+  type: string
+  price: string
+  description: string
+  tags: string[]
+  highlights?: string[]
+  sourceUrl: string
+  selected: boolean
+}
+
 export default function Index() {
   const [inspirations, setInspirations] = useState<Inspiration[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -47,6 +61,11 @@ export default function Index() {
   const [showPasteDialog, setShowPasteDialog] = useState(false)
   const [linkInput, setLinkInput] = useState('')
   const [pasting, setPasting] = useState(false)
+
+  // 预览灵感点弹窗
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false)
+  const [previewPoints, setPreviewPoints] = useState<InspirationPoint[]>([])
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   // 检查登录状态
   const checkLogin = async () => {
@@ -146,8 +165,9 @@ export default function Index() {
 
     setPasting(true)
     try {
-      const res = await Network.request({
-        url: '/api/trip/parse',
+      // 先预览多个灵感点
+      const previewRes = await Network.request({
+        url: '/api/trip/preview',
         method: 'POST',
         data: {
           userId: userInfo?.id,
@@ -156,22 +176,84 @@ export default function Index() {
         }
       })
       
-      console.log('收录结果:', res.data)
+      console.log('预览结果:', previewRes.data)
       
-      if (res.data?.success) {
-        Taro.showToast({ title: res.data?.message || '收录成功', icon: 'success' })
-        setLinkInput('')
+      if (previewRes.data?.success && previewRes.data?.data?.inspirationPoints?.length > 0) {
+        // 有关灵感点，展示让用户选择
+        setPreviewPoints(previewRes.data.data.inspirationPoints)
         setShowPasteDialog(false)
-        fetchInspirations()
+        setShowPreviewDialog(true)
+        setLinkInput('')
       } else {
-        Taro.showToast({ title: res.data?.message || '收录失败', icon: 'none' })
+        // 没有提取到灵感点，直接收录
+        Taro.showToast({ title: previewRes.data?.message || '未能提取到灵感点', icon: 'none' })
       }
     } catch (error) {
-      console.error('收录失败:', error)
-      Taro.showToast({ title: '收录失败', icon: 'none' })
+      console.error('预览失败:', error)
+      Taro.showToast({ title: '预览失败', icon: 'none' })
     } finally {
       setPasting(false)
     }
+  }
+
+  // 保存选中的灵感点
+  const handleSaveSelected = async () => {
+    const selectedPoints = previewPoints.filter(p => p.selected)
+    
+    if (selectedPoints.length === 0) {
+      Taro.showToast({ title: '请至少选择一个灵感点', icon: 'none' })
+      return
+    }
+
+    setPreviewLoading(true)
+    try {
+      // 批量保存
+      const items = selectedPoints.map(point => ({
+        user_id: userInfo?.id,
+        title: point.name,
+        source: 'xiaohongshu',
+        type: point.type,
+        location_name: point.location,
+        time: point.time,
+        price: point.price,
+        description: point.description,
+        original_url: point.sourceUrl,
+        tags: point.tags
+      }))
+
+      const res = await Network.request({
+        url: '/api/trip/inspirations/batch',
+        method: 'POST',
+        data: { items }
+      })
+
+      if (res.data?.success) {
+        Taro.showToast({ title: `已收录 ${selectedPoints.length} 个灵感点`, icon: 'success' })
+        setShowPreviewDialog(false)
+        setPreviewPoints([])
+        fetchInspirations()
+      } else {
+        Taro.showToast({ title: res.data?.message || '保存失败', icon: 'none' })
+      }
+    } catch (error) {
+      console.error('保存失败:', error)
+      Taro.showToast({ title: '保存失败', icon: 'none' })
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  // 切换灵感点选中状态
+  const togglePointSelected = (index: number) => {
+    setPreviewPoints(prev => prev.map((point, i) => 
+      i === index ? { ...point, selected: !point.selected } : point
+    ))
+  }
+
+  // 全选/取消全选预览
+  const toggleAllPreview = () => {
+    const allSelected = previewPoints.every(p => p.selected)
+    setPreviewPoints(prev => prev.map(point => ({ ...point, selected: !allSelected })))
   }
 
   // 粘贴剪贴板
@@ -438,6 +520,132 @@ export default function Index() {
                 <Text className="text-white">{pasting ? '收录中...' : '收录'}</Text>
               </Button>
             </View>
+          </View>
+        </View>
+      </Dialog>
+
+      {/* 预览灵感点弹窗 */}
+      <Dialog open={showPreviewDialog} onOpenChange={(open) => !open && setShowPreviewDialog(false)}>
+        <View className="p-4 max-h-[70vh] overflow-y-auto">
+          <View className="text-center mb-4">
+            <Text className="block text-lg font-medium text-gray-900">发现 {previewPoints.length} 个灵感点</Text>
+            <Text className="block text-sm text-gray-500 mt-1">选择你想要收录的灵感点</Text>
+          </View>
+          
+          {/* 全选 */}
+          <View className="flex items-center justify-between mb-3 px-2">
+            <View className="flex items-center gap-2">
+              <Checkbox 
+                checked={previewPoints.every(p => p.selected)}
+                onCheckedChange={toggleAllPreview}
+              />
+              <Text className="block text-sm text-gray-600">全选</Text>
+            </View>
+            <Text className="block text-sm text-blue-500">
+              已选 {previewPoints.filter(p => p.selected).length} 个
+            </Text>
+          </View>
+
+          {/* 灵感点列表 */}
+          <View className="space-y-3">
+            {previewPoints.map((point, index) => (
+              <View 
+                key={index}
+                className={`bg-gray-50 rounded-xl p-4 border-2 transition-all ${
+                  point.selected ? 'border-blue-500' : 'border-transparent'
+                }`}
+                onClick={() => togglePointSelected(index)}
+              >
+                <View className="flex gap-3">
+                  {/* 复选框 */}
+                  <View className="flex items-start pt-1">
+                    <Checkbox 
+                      checked={point.selected}
+                      onCheckedChange={() => togglePointSelected(index)}
+                    />
+                  </View>
+                  
+                  {/* 内容 */}
+                  <View className="flex-1">
+                    {/* 标题和类型 */}
+                    <View className="flex items-center gap-2 mb-2">
+                      <Text className="block text-base font-medium text-gray-900 flex-1">
+                        {point.name}
+                      </Text>
+                      <Badge 
+                        variant="secondary" 
+                        style={{ 
+                          backgroundColor: (typeConfig[point.type as keyof typeof typeConfig]?.color || '#64748b') + '20',
+                          color: typeConfig[point.type as keyof typeof typeConfig]?.color || '#64748b'
+                        }}
+                      >
+                        {typeConfig[point.type as keyof typeof typeConfig]?.icon || '📍'}{' '}
+                        {typeConfig[point.type as keyof typeof typeConfig]?.label || '其他'}
+                      </Badge>
+                    </View>
+                    
+                    {/* 地点和时间 */}
+                    <View className="flex items-center gap-3 text-sm text-gray-500 mb-2">
+                      {point.location && (
+                        <View className="flex items-center gap-1">
+                          <MapPin size={12} color="#6b7280" />
+                          <Text className="block">{point.location}</Text>
+                        </View>
+                      )}
+                      {point.time && (
+                        <View className="flex items-center gap-1">
+                          <Calendar size={12} color="#6b7280" />
+                          <Text className="block">{point.time}</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    {/* 价格 */}
+                    {point.price && point.price !== '待定' && (
+                      <Text className="block text-sm text-orange-500 mb-2">
+                        💰 {point.price}
+                      </Text>
+                    )}
+                    
+                    {/* 描述 */}
+                    <Text className="block text-sm text-gray-600 mb-2">
+                      {point.description}
+                    </Text>
+                    
+                    {/* 亮点标签 */}
+                    {(point.tags?.length > 0 || (point.highlights && point.highlights.length > 0)) && (
+                      <View className="flex flex-wrap gap-2">
+                        {(point.tags || []).slice(0, 4).map((tag, i) => (
+                          <Badge key={i} variant="outline" className="text-xs px-2 py-1">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </View>
+                    )}
+                    
+                    {/* 来源链接 */}
+                    {point.sourceUrl && (
+                      <Text className="block text-xs text-gray-400 mt-2 truncate">
+                        来源: {point.sourceUrl}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* 保存按钮 */}
+          <View className="mt-4">
+            <Button 
+              className="w-full bg-blue-500"
+              onClick={handleSaveSelected}
+              disabled={previewLoading}
+            >
+              <Text className="text-white">
+                {previewLoading ? '保存中...' : `收录 ${previewPoints.filter(p => p.selected).length} 个灵感点`}
+              </Text>
+            </Button>
           </View>
         </View>
       </Dialog>

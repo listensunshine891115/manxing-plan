@@ -48,6 +48,17 @@ export class TripController {
     return { code: 200, msg: 'success', ...result }
   }
 
+  // 预览多个灵感点（从字幕中提取）
+  @Post('preview')
+  async previewInspirations(@Body() body: { userId: string; url?: string; text?: string }) {
+    console.log(`[POST] /api/trip/preview - userId: ${body.userId}`)
+    const result = await this.parseService.previewMultiple(body.userId, {
+      url: body.url,
+      text: body.text
+    })
+    return { code: 200, msg: 'success', ...result }
+  }
+
   // 批量添加灵感
   @Post('inspirations/batch')
   async batchAddInspirations(@Body() body: { items: any[] }) {

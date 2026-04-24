@@ -200,6 +200,151 @@ export class ParseService {
     }
   }
 
+  // 预览多个灵感点
+  async previewMultiple(
+    userId: string,
+    input: { url?: string; text?: string }
+  ): Promise<{
+    success: boolean
+    data?: {
+      totalCount: number
+      inspirationPoints: any[]
+      summary: string
+      sourceUrl: string
+    }
+    message?: string
+  }> {
+    try {
+      console.log(`[Parse] 预览多个灵感点 - userId: ${userId}`)
+
+      let content = ''
+      let title = ''
+      let sourceUrl = input.url || ''
+      let sourceType: SourceType = 'article'
+
+      // 提取 URL
+      if (input.url) {
+        const extractedUrl = this.extractUrl(input.url || '')
+        if (extractedUrl) {
+          sourceUrl = extractedUrl
+          sourceType = this.detectSourceType(sourceUrl)
+        } else {
+          sourceUrl = ''
+        }
+      }
+
+      // 根据来源类型获取内容
+      if (sourceUrl) {
+        if (sourceType === 'video') {
+          // 视频类型：提取字幕
+          const subtitleResult = await this.extractVideoSubtitle(sourceUrl)
+          
+          if (subtitleResult) {
+            content = subtitleResult
+          } else {
+            // 降级：用 yt-dlp 获取信息
+            const ytDlpResult = await this.getVideoInfoWithYtDlp(sourceUrl)
+            if (ytDlpResult.success) {
+              content = ytDlpResult.description || ytDlpResult.title || ''
+              title = ytDlpResult.title || '未命名'
+            } else {
+              return { success: false, message: '无法获取视频内容' }
+            }
+          }
+        } else {
+          // 其他类型：fetch 获取内容
+          const fetchResult = await this.fetchUrl(sourceUrl)
+          if (!fetchResult.success) {
+            return { success: false, message: fetchResult.message || '获取页面失败' }
+          }
+          content = fetchResult.content || ''
+          title = fetchResult.title || ''
+        }
+      } else if (input.text) {
+        // 直接输入文字
+        content = this.extractTextFromInput(input.text)
+        title = ''
+        sourceType = 'text'
+      } else {
+        return { success: false, message: '请提供 url 或 text 参数' }
+      }
+
+      if (!content) {
+        return { success: false, message: '未能获取到内容' }
+      }
+
+      console.log(`[Parse] 开始分析内容，长度: ${content.length}`)
+
+      // 调用 LLM 提取多个灵感点
+      const prompt = this.buildMultiExtractPrompt(content, sourceType, title, sourceUrl)
+      
+      const response = await this.llmClient.invoke(
+        [{ role: 'user', content: prompt }],
+        {
+          model: 'doubao-seed-2-0-lite-260215',
+          temperature: 0.7
+        }
+      )
+
+      // 解析 LLM 返回的 JSON
+      const result = this.parseMultiLLMResponse(response.content)
+
+      console.log(`[Parse] 提取到 ${result.inspirationPoints.length} 个灵感点`)
+
+      return {
+        success: true,
+        data: {
+          totalCount: result.inspirationPoints.length,
+          inspirationPoints: result.inspirationPoints.map((point: any) => ({
+            ...point,
+            sourceUrl: sourceUrl,
+            selected: true, // 默认全部选中
+          })),
+          summary: result.summary,
+          sourceUrl: sourceUrl
+        },
+        message: `从内容中提取到 ${result.inspirationPoints.length} 个灵感点`
+      }
+    } catch (error: any) {
+      console.error(`[Parse] 预览失败:`, error)
+      return { success: false, message: `预览失败: ${error.message}` }
+    }
+  }
+
+  // 解析多个灵感点的 LLM 返回
+  private parseMultiLLMResponse(content: string): {
+    totalCount: number
+    inspirationPoints: any[]
+    summary: string
+  } {
+    try {
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      
+      if (!jsonMatch) {
+        return {
+          totalCount: 0,
+          inspirationPoints: [],
+          summary: content.slice(0, 200) || '无法解析内容'
+        }
+      }
+
+      const parsed = JSON.parse(jsonMatch[0])
+      
+      return {
+        totalCount: parsed.totalCount || parsed.inspirationPoints?.length || 0,
+        inspirationPoints: parsed.inspirationPoints || [],
+        summary: parsed.summary || ''
+      }
+    } catch (error) {
+      console.error(`[Parse] 解析多个灵感点失败:`, error)
+      return {
+        totalCount: 0,
+        inspirationPoints: [],
+        summary: content.slice(0, 200) || '解析失败'
+      }
+    }
+  }
+
   // 使用本地 ASR 服务提取视频字幕（百度/讯飞）
   private async extractVideoSubtitle(url: string): Promise<string | null> {
     try {
@@ -407,7 +552,7 @@ export class ParseService {
     return result
   }
 
-  // 构建提取提示词
+  // 构建提取提示词（单条）
   private buildExtractPrompt(
     content: string,
     sourceType: SourceType,
@@ -441,6 +586,50 @@ ${content || '(无正文内容)'}
 请直接返回 JSON，不要添加任何解释。`
 
     return basePrompt
+  }
+
+  // 构建提取多个灵感点的提示词
+  private buildMultiExtractPrompt(
+    content: string,
+    sourceType: SourceType,
+    title: string,
+    originalUrl: string
+  ): string {
+    return `你是一个专业的旅行活动信息提取助手。请从以下内容中仔细分析，提取出所有可能的旅行灵感点。
+
+这是一段旅行相关的视频字幕或文章内容，需要你从中挖掘出有价值的活动灵感。
+
+要求：
+1. 仔细阅读内容，识别出所有提到的具体活动、景点、美食店、演出等
+2. 每个灵感点需要包含：名称、类型、地点、时间、价格、描述
+3. 类型分为：景点、美食、演出/活动、酒店/住宿
+4. 如果提到多个地点，都要提取出来
+5. 提取相关的标签（地点、类型、特色等）
+6. 每个灵感点描述要详细，包含为什么值得去
+
+内容：
+${title ? `标题：${title}\n` : ''}
+${content || '(无正文内容)'}
+
+请以 JSON 格式返回，包含一个 inspirationPoints 数组：
+{
+  "totalCount": 3,
+  "inspirationPoints": [
+    {
+      "name": "灵感点名称",
+      "location": "具体地址或地点",
+      "time": "推荐时间/游览时长",
+      "type": "景点/美食/演出/活动/酒店",
+      "price": "人均/门票价格",
+      "description": "详细描述：包含推荐理由、特色亮点等",
+      "tags": ["地点", "类型", "特色标签"],
+      "highlights": ["亮点1", "亮点2"]
+    }
+  ],
+  "summary": "整体内容的简要总结"
+}
+
+请尽可能多地提取有价值的灵感点（1-10个），每个都要有详细信息。直接返回 JSON。`
   }
 
   // 解析 LLM 返回的 JSON
