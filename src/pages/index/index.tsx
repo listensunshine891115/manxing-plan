@@ -373,13 +373,9 @@ export default function Index() {
             <Sparkles size={32} color="#9ca3af" />
           </View>
           <Text className="block text-base font-medium text-gray-900 mb-2">暂无灵感</Text>
-          <Text className="block text-sm text-gray-400 text-center px-8 mb-4">
+          <Text className="block text-sm text-gray-400 text-center px-8">
             点击「粘贴灵感」收录{'\n'}短视频、票务平台、公众号文章&quot;链接&quot;
           </Text>
-          <Button className="bg-blue-500" onClick={() => setShowPasteDialog(true)}>
-            <Link2 size={16} color="#fff" />
-            <Text className="text-white ml-2">粘贴灵感</Text>
-          </Button>
         </View>
       )}
 
