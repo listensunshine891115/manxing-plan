@@ -3,16 +3,20 @@ export interface Inspiration {
   id: string
   title: string
   image: string
-  source: 'xiaohongshu' | 'dazhong' | 'damai' | 'other'
+  source: 'xiaohongshu' | 'dazhong' | 'damai' | 'other' | string  // 支持更多来源
   type: 'spot' | 'food' | 'show' | 'hotel'
-  location: {
+  location_name?: string  // 地点名称（字符串格式）
+  location?: {
     name: string
     lat: number
     lng: number
   }
   time?: string
-  price?: number
-  rating?: number
+  price?: number | string
+  description?: string
+  original_url?: string
+  tags?: string[]
+  create_time?: string
   createTime?: string | number
 }
 

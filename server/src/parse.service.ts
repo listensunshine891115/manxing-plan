@@ -6,6 +6,36 @@ import { AudioService } from './audio.service'
 import { VideoParseService } from './video-parse.service'
 import { execSync } from 'child_process'
 
+// 类型映射：中文 -> 英文
+const typeMap: Record<string, string> = {
+  '景点': 'spot',
+  'spot': 'spot',
+  '旅游': 'spot',
+  '游览': 'spot',
+  '美食': 'food',
+  'food': 'food',
+  '餐饮': 'food',
+  '吃': 'food',
+  '餐厅': 'food',
+  '演出': 'show',
+  'show': 'show',
+  '表演': 'show',
+  '演唱会': 'show',
+  '活动': 'show',
+  '酒店': 'hotel',
+  'hotel': 'hotel',
+  '住宿': 'hotel',
+  '民宿': 'hotel',
+  '客栈': 'hotel',
+  '视频': 'spot',  // 默认视频类型为景点
+  '默认': 'spot',
+}
+
+function normalizeType(type: string): string {
+  if (!type) return 'spot'
+  return typeMap[type] || 'spot'
+}
+
 // 解析后的灵感数据
 export interface ParsedInspiration {
   name: string
@@ -144,7 +174,7 @@ export class ParseService {
         title: parsed.name,
         image: parsed.coverImage,
         source: parsed.source,
-        type: parsed.type,
+        type: normalizeType(parsed.type),  // 转换类型为英文
         location: parsed.location,
         time: parsed.time,
         price: parsed.price,

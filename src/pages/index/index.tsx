@@ -74,7 +74,13 @@ export default function Index() {
       })
       console.log('[GET] /api/trip/inspirations - Response:', JSON.stringify(res.data))
       if (res.data?.data) {
-        setInspirations(res.data.data)
+        // 映射数据格式
+        const mappedData = res.data.data.map((item: any) => ({
+          ...item,
+          createTime: item.create_time || item.createTime,
+          location_name: item.location_name || item.location?.name || '',
+        }))
+        setInspirations(mappedData)
       }
     } catch (error) {
       console.error('获取灵感失败:', error)
@@ -338,7 +344,7 @@ export default function Index() {
                       <Text className="block text-sm font-medium text-foreground mb-1">
                         {item.title}
                       </Text>
-                      <View className="flex items-center gap-2">
+                      <View className="flex items-center gap-2 flex-wrap">
                         <Badge 
                           variant="secondary" 
                           className="text-xs"
@@ -349,13 +355,12 @@ export default function Index() {
                         >
                           {sourceConfig[item.source]?.label || '其他'}
                         </Badge>
-                        <Text className="block text-xs text-gray-400">
-                          {typeof item.createTime === 'string' 
-                            ? item.createTime.slice(0, 10) 
-                            : item.createTime 
-                              ? new Date(item.createTime as number).toLocaleDateString() 
-                              : ''}
-                        </Text>
+                        {item.location_name && (
+                          <View className="flex items-center gap-1">
+                            <MapPin size={10} color="#6b7280" />
+                            <Text className="block text-xs text-gray-500">{item.location_name}</Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                     <ChevronRight size={16} color="#9ca3af" />
