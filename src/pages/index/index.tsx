@@ -405,7 +405,7 @@ export default function Index() {
             </View>
             <Text className="block text-lg font-medium text-gray-900">粘贴灵感</Text>
             <Text className="block text-sm text-gray-500 mt-1">
-              粘贴你的灵感短视频、票务平台、公众号文章&quot;链接&quot;，一键形成灵感库
+              粘贴你的：种草短视频、票务平台、公众号文章&quot;链接&quot;，一键形成灵感库
             </Text>
           </View>
           <View className="bg-gray-50 rounded-xl p-4 mb-4">
