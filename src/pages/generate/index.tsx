@@ -99,6 +99,7 @@ export default function Generate() {
   const [searchResults, setSearchResults] = useState<PlaceResult[]>([])
   const [showSearch, setShowSearch] = useState(false)
   const [searching, setSearching] = useState(false)
+  const [inputValue, setInputValue] = useState('') // 临时输入值
 
   // 选中的灵感点
   const [selectedInspirations, setSelectedInspirations] = useState<InspirationItem[]>([])
@@ -150,7 +151,7 @@ export default function Generate() {
     }
   }
 
-  // 搜索集合地点
+  // 搜索集合地点（回车触发）
   const searchMeetingPoint = async (keyword: string) => {
     if (!keyword.trim()) {
       setSearchResults([])
@@ -188,6 +189,7 @@ export default function Generate() {
   const selectMeetingPoint = (place: PlaceResult) => {
     setMeetingPoint(place.name)
     setMeetingCoords({ lat: place.lat, lng: place.lng })
+    setInputValue('') // 清空输入
     setShowSearch(false)
     setSearchResults([])
   }
@@ -196,6 +198,7 @@ export default function Generate() {
   const clearMeetingPoint = () => {
     setMeetingPoint('')
     setMeetingCoords(null)
+    setInputValue('')
   }
 
   // 生成路线
@@ -567,11 +570,11 @@ export default function Generate() {
                     <Input
                       className="flex-1 ml-2 text-sm bg-transparent"
                       placeholder="输入集合地点名称后回车搜索"
-                      value={meetingPoint}
-                      onInput={(e: any) => setMeetingPoint(e.detail.value)}
+                      value={inputValue}
+                      onInput={(e: any) => setInputValue(e.detail.value)}
                       onConfirm={() => {
-                        if (meetingPoint.trim()) {
-                          searchMeetingPoint(meetingPoint)
+                        if (inputValue.trim()) {
+                          searchMeetingPoint(inputValue.trim())
                         }
                       }}
                     />
