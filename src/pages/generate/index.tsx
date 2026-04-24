@@ -2,22 +2,30 @@ import { useState, useEffect } from 'react'
 import { View, Text } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
-import { Slider } from '@/components/ui/slider'
+import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Checkbox } from '@/components/ui/checkbox'
-import { ArrowLeft, CalendarDays, Clock, Wallet, Car, Bus, Sparkles, MapPin, Users, ChevronRight, Loader } from 'lucide-react-taro'
+import { ArrowLeft, CalendarDays, Clock, Car, Bus, MapPin, Search, X, ChevronRight, Loader, Navigation, Sparkles } from 'lucide-react-taro'
 import { format } from 'date-fns'
 import { Network } from '@/network'
 import Taro from '@tarojs/taro'
 import './index.css'
 
-// 出行需求选项
-const demandOptions = [
-  { value: 'relax', label: '休闲放松', icon: '🧘', desc: '慢节奏，重体验' },
-  { value: 'adventure', label: '探索冒险', icon: '🏔️', desc: '多打卡，重发现' },
-  { value: 'food', label: '美食之旅', icon: '🍜', desc: '吃遍当地美味' },
-  { value: 'culture', label: '文化沉浸', icon: '🏛️', desc: '博物馆、历史' }
+// 行程时段选项
+const timePeriodOptions = [
+  { value: 'half', label: '半天', days: 0.5 },
+  { value: 'one_day', label: '一天', days: 1 },
+  { value: 'two_three', label: '2-3天', days: 2.5 },
+  { value: 'three_five', label: '3-5天', days: 4 },
+  { value: 'week_plus', label: '5天以上', days: 7 }
 ]
+
+// 集合地点搜索结果类型
+interface PlaceResult {
+  name: string
+  address: string
+  lat: number
+  lng: number
+}
 
 // 灵感点类型
 interface InspirationItem {
@@ -74,12 +82,16 @@ interface RoutePlanResult {
 export default function Generate() {
   // 出行设置
   const [startDate, setStartDate] = useState<Date>(new Date())
-  const [days, setDays] = useState(3)
-  const [budget, setBudget] = useState<number>(0)
+  const [timePeriod, setTimePeriod] = useState('two_three')
   const [transportMode, setTransportMode] = useState<'public' | 'self-drive'>('public')
-  const [selectedDemand, setSelectedDemand] = useState<string>('relax')
-  const [mainDestination, setMainDestination] = useState('')
   const [showCalendar, setShowCalendar] = useState(false)
+
+  // 集合地点
+  const [meetingPoint, setMeetingPoint] = useState('')
+  const [meetingCoords, setMeetingCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [searchResults, setSearchResults] = useState<PlaceResult[]>([])
+  const [showSearch, setShowSearch] = useState(false)
+  const [searching, setSearching] = useState(false)
 
   // 选中的灵感点
   const [selectedInspirations, setSelectedInspirations] = useState<InspirationItem[]>([])
@@ -131,6 +143,60 @@ export default function Generate() {
     }
   }
 
+  // 搜索集合地点
+  const searchMeetingPoint = async (keyword: string) => {
+    if (!keyword.trim()) {
+      setSearchResults([])
+      return
+    }
+
+    setSearching(true)
+    try {
+      // 调用高德地图搜索 API（通过后端代理）
+      const res = await Network.request({
+        url: '/api/map/search',
+        method: 'POST',
+        data: { keywords: keyword }
+      })
+
+      console.log('[POST] /api/map/search - Response:', res.data)
+
+      if (res.data && res.data.data) {
+        setSearchResults(res.data.data)
+        setShowSearch(true)
+      }
+    } catch (error) {
+      console.error('搜索地点失败:', error)
+      // 模拟搜索结果（无 KEY 时）
+      setSearchResults([
+        { name: keyword, address: '搜索结果', lat: 24.48 + Math.random(), lng: 118.11 + Math.random() }
+      ])
+      setShowSearch(true)
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  // 选择搜索结果
+  const selectMeetingPoint = (place: PlaceResult) => {
+    setMeetingPoint(place.name)
+    setMeetingCoords({ lat: place.lat, lng: place.lng })
+    setShowSearch(false)
+    setSearchResults([])
+  }
+
+  // 清除集合地点
+  const clearMeetingPoint = () => {
+    setMeetingPoint('')
+    setMeetingCoords(null)
+  }
+
+  // 获取行程天数
+  const getDays = () => {
+    const option = timePeriodOptions.find(o => o.value === timePeriod)
+    return option?.days || 1
+  }
+
   // 生成路线
   const handleGenerate = async () => {
     if (selectedInspirations.length === 0) {
@@ -160,9 +226,14 @@ export default function Generate() {
         method: 'POST',
         data: {
           inspirations: inspirationsData,
-          mainDestination,
-          days,
-          startDate: format(startDate, 'yyyy-MM-dd')
+          mainDestination: meetingCoords ? `${meetingPoint}` : undefined,
+          days: Math.ceil(getDays()),
+          startDate: format(startDate, 'yyyy-MM-dd'),
+          meetingPoint: meetingCoords ? {
+            name: meetingPoint,
+            lat: meetingCoords.lat,
+            lng: meetingCoords.lng
+          } : undefined
         }
       })
 
@@ -172,8 +243,12 @@ export default function Generate() {
       if (res.data && res.data.code === 200 && res.data.data) {
         const result: RoutePlanResult = res.data.data
 
+        // 将集合地点也存入缓存
+        if (meetingCoords) {
+          result.settings.mainDestination = meetingPoint
+        }
+
         // 将结果存储到全局或跳转时传递
-        // 使用 Taro.setStorage 存储路线规划结果
         await Taro.setStorage({ key: 'routePlanResult', data: result })
 
         // 跳转到路线展示页
@@ -212,21 +287,21 @@ export default function Generate() {
   }
 
   return (
-    <View className="min-h-screen bg-background pb-28">
+    <View className="min-h-screen bg-gray-50 pb-28">
       {/* 顶部导航 */}
-      <View className="sticky top-0 z-10 bg-background border-b border-border px-4 py-3">
+      <View className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3">
         <View className="flex items-center">
-          <Button variant="ghost" size="icon" onClick={() => window.history.back()}>
+          <Button variant="ghost" size="icon" onClick={() => Taro.navigateBack()}>
             <ArrowLeft size={24} color="#1E293B" />
           </Button>
-          <Text className="block text-lg font-semibold text-foreground ml-2">出行设置</Text>
+          <Text className="block text-lg font-semibold text-gray-900 ml-2">出行设置</Text>
         </View>
       </View>
 
       {/* 选中的灵感点预览 */}
       {selectedInspirations.length > 0 && (
-        <View className="px-4 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
-          <View className="flex items-center justify-between mb-3">
+        <View className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+          <View className="flex items-center justify-between mb-2">
             <Text className="block text-sm font-medium text-blue-700">
               已选择 {selectedInspirations.length} 个灵感点
             </Text>
@@ -244,23 +319,23 @@ export default function Generate() {
             </View>
           ) : (
             <View className="flex flex-wrap gap-2">
-              {selectedInspirations.slice(0, 6).map(ins => (
+              {selectedInspirations.slice(0, 5).map(ins => (
                 <View 
                   key={ins.id}
-                  className="px-3 py-2 bg-white rounded-full border border-blue-200 flex items-center"
+                  className="px-2 py-1 bg-white rounded-full border border-blue-200 flex items-center"
                 >
                   <Text className="block text-xs text-gray-700">
                     {ins.type === 'food' ? '🍜' : ins.type === 'shopping' ? '🛍️' : '🏛️'}
                   </Text>
-                  <Text className="block text-xs text-gray-700 ml-1 max-w-24 truncate">
+                  <Text className="block text-xs text-gray-700 ml-1 max-w-20 truncate">
                     {ins.title}
                   </Text>
                 </View>
               ))}
-              {selectedInspirations.length > 6 && (
-                <View className="px-3 py-2 bg-white rounded-full bg-opacity-50">
+              {selectedInspirations.length > 5 && (
+                <View className="px-2 py-1 bg-white bg-opacity-50 rounded-full">
                   <Text className="block text-xs text-gray-500">
-                    +{selectedInspirations.length - 6} 更多
+                    +{selectedInspirations.length - 5}
                   </Text>
                 </View>
               )}
@@ -270,209 +345,229 @@ export default function Generate() {
       )}
 
       {/* 设置表单 */}
-      <View className="px-4 py-5 space-y-5">
+      <View className="px-4 py-5 space-y-4">
         
         {/* 出发日期 */}
-        <View className="setting-card">
-          <View className="setting-header">
-            <CalendarDays size={18} color="#3B82F6" />
-            <Text className="block text-sm font-medium text-foreground ml-2">出发日期</Text>
+        <View className="bg-white rounded-xl p-4 shadow-sm">
+          <View className="flex items-center mb-3">
+            <View className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <CalendarDays size={16} color="#3b82f6" />
+            </View>
+            <Text className="block text-sm font-medium text-gray-900 ml-2">出发日期</Text>
           </View>
           <Button 
             variant="outline" 
-            className="w-full justify-start mt-3 h-11"
+            className="w-full justify-start h-11 border-gray-200"
             onClick={() => setShowCalendar(true)}
           >
-            <Text className="block text-sm text-foreground">
-              {format(startDate, 'yyyy年MM月dd日')}（{days}天行程）
+            <Text className="block text-sm text-gray-700">
+              {format(startDate, 'yyyy年MM月dd日')}
             </Text>
           </Button>
         </View>
 
-        {/* 行程天数 */}
-        <View className="setting-card">
-          <View className="setting-header">
-            <Clock size={18} color="#3B82F6" />
-            <Text className="block text-sm font-medium text-foreground ml-2">行程天数</Text>
-          </View>
-          <View className="mt-3">
-            <Slider
-              value={[days]}
-              onValueChange={(val) => setDays(val[0])}
-              min={1}
-              max={7}
-              step={1}
-            />
-            <View className="flex justify-between mt-2">
-              <Text className="block text-xs text-muted-foreground">1天</Text>
-              <Text className="block font-semibold" style={{ color: '#3B82F6' }}>{days}天</Text>
-              <Text className="block text-xs text-muted-foreground">7天</Text>
+        {/* 行程时段 */}
+        <View className="bg-white rounded-xl p-4 shadow-sm">
+          <View className="flex items-center mb-3">
+            <View className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Clock size={16} color="#3b82f6" />
             </View>
+            <Text className="block text-sm font-medium text-gray-900 ml-2">行程时段</Text>
           </View>
-        </View>
-
-        {/* 主要目的地 */}
-        <View className="setting-card">
-          <View className="setting-header">
-            <MapPin size={18} color="#3B82F6" />
-            <Text className="block text-sm font-medium text-foreground ml-2">主要目的地</Text>
-          </View>
-          <View className="mt-3 flex gap-2 flex-wrap">
-            {['厦门', '杭州', '成都', '大理', '重庆', '西安'].map(city => (
-              <View
-                key={city}
-                className="city-tag"
-                onClick={() => setMainDestination(city)}
-                style={{
-                  backgroundColor: mainDestination === city ? '#EFF6FF' : '#F8FAFC',
-                  borderColor: mainDestination === city ? '#3B82F6' : '#E2E8F0'
-                }}
-              >
-                <Text 
-                  className="block text-xs"
-                  style={{ color: mainDestination === city ? '#3B82F6' : '#64748B' }}
-                >
-                  {city}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* 出行需求 */}
-        <View className="setting-card">
-          <View className="setting-header">
-            <Sparkles size={18} color="#3B82F6" />
-            <Text className="block text-sm font-medium text-foreground ml-2">出行需求</Text>
-          </View>
-          <View className="mt-3 grid grid-cols-2 gap-2">
-            {demandOptions.map(opt => (
+          <View className="flex flex-wrap gap-2">
+            {timePeriodOptions.map(opt => (
               <View
                 key={opt.value}
-                className="demand-item"
-                onClick={() => setSelectedDemand(opt.value)}
+                className="px-4 py-2 rounded-full border cursor-pointer transition-all"
+                onClick={() => setTimePeriod(opt.value)}
                 style={{
-                  backgroundColor: selectedDemand === opt.value ? '#EFF6FF' : '#F8FAFC',
-                  borderColor: selectedDemand === opt.value ? '#3B82F6' : '#E2E8F0'
+                  backgroundColor: timePeriod === opt.value ? '#eff6ff' : '#f8fafc',
+                  borderColor: timePeriod === opt.value ? '#3b82f6' : '#e2e8f0'
                 }}
               >
-                <Text className="block text-lg mb-1">{opt.icon}</Text>
                 <Text 
-                  className="block text-xs font-medium"
-                  style={{ color: selectedDemand === opt.value ? '#3B82F6' : '#1E293B' }}
+                  className="block text-sm"
+                  style={{ color: timePeriod === opt.value ? '#3b82f6' : '#64748b' }}
                 >
                   {opt.label}
                 </Text>
-                <Text className="block text-xs text-muted-foreground mt-1">
-                  {opt.desc}
-                </Text>
               </View>
             ))}
-          </View>
-        </View>
-
-        {/* 预算范围 */}
-        <View className="setting-card">
-          <View className="setting-header">
-            <Wallet size={18} color="#3B82F6" />
-            <Text className="block text-sm font-medium text-foreground ml-2">预算范围</Text>
-            <Text className="block text-xs text-muted-foreground ml-auto">可选</Text>
-          </View>
-          <View className="mt-3">
-            <Slider
-              value={[budget]}
-              onValueChange={(val) => setBudget(val[0])}
-              min={0}
-              max={10000}
-              step={500}
-            />
-            <View className="flex justify-between mt-2">
-              <Text className="block text-xs text-muted-foreground">不限</Text>
-              <Text className="block font-semibold" style={{ color: '#3B82F6' }}>
-                {budget > 0 ? `¥${budget}` : '不限'}
-              </Text>
-              <Text className="block text-xs text-muted-foreground">¥10000</Text>
-            </View>
           </View>
         </View>
 
         {/* 出行方式 */}
-        <View className="setting-card">
-          <View className="setting-header">
-            {transportMode === 'public' ? (
-              <Bus size={18} color="#3B82F6" />
-            ) : (
-              <Car size={18} color="#3B82F6" />
-            )}
-            <Text className="block text-sm font-medium text-foreground ml-2">出行方式</Text>
+        <View className="bg-white rounded-xl p-4 shadow-sm">
+          <View className="flex items-center mb-3">
+            <View className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              {transportMode === 'public' ? (
+                <Bus size={16} color="#3b82f6" />
+              ) : (
+                <Car size={16} color="#3b82f6" />
+              )}
+            </View>
+            <Text className="block text-sm font-medium text-gray-900 ml-2">出行方式</Text>
           </View>
           <RadioGroup 
             value={transportMode} 
             onValueChange={(val) => setTransportMode(val as 'public' | 'self-drive')}
-            className="mt-3 space-y-2"
+            className="flex gap-3"
           >
             <View 
-              className="transport-item"
+              className="flex-1 flex items-center justify-center py-3 rounded-xl border cursor-pointer"
               onClick={() => setTransportMode('public')}
               style={{
-                backgroundColor: transportMode === 'public' ? '#EFF6FF' : '#F8FAFC',
-                borderColor: transportMode === 'public' ? '#3B82F6' : '#E2E8F0'
+                backgroundColor: transportMode === 'public' ? '#eff6ff' : '#f8fafc',
+                borderColor: transportMode === 'public' ? '#3b82f6' : '#e2e8f0'
               }}
             >
               <RadioGroupItem value="public" />
               <View className="flex items-center ml-2">
-                <Bus size={16} color="#64748B" />
-                <Text className="block text-sm text-foreground ml-2">公共交通</Text>
+                <Bus size={16} color={transportMode === 'public' ? '#3b82f6' : '#64748b'} />
+                <Text 
+                  className="block text-sm ml-1"
+                  style={{ color: transportMode === 'public' ? '#3b82f6' : '#64748b' }}
+                >
+                  公共交通
+                </Text>
               </View>
             </View>
             <View 
-              className="transport-item"
+              className="flex-1 flex items-center justify-center py-3 rounded-xl border cursor-pointer"
               onClick={() => setTransportMode('self-drive')}
               style={{
-                backgroundColor: transportMode === 'self-drive' ? '#EFF6FF' : '#F8FAFC',
-                borderColor: transportMode === 'self-drive' ? '#3B82F6' : '#E2E8F0'
+                backgroundColor: transportMode === 'self-drive' ? '#eff6ff' : '#f8fafc',
+                borderColor: transportMode === 'self-drive' ? '#3b82f6' : '#e2e8f0'
               }}
             >
               <RadioGroupItem value="self-drive" />
               <View className="flex items-center ml-2">
-                <Car size={16} color="#64748B" />
-                <Text className="block text-sm text-foreground ml-2">自驾出行</Text>
+                <Car size={16} color={transportMode === 'self-drive' ? '#3b82f6' : '#64748b'} />
+                <Text 
+                  className="block text-sm ml-1"
+                  style={{ color: transportMode === 'self-drive' ? '#3b82f6' : '#64748b' }}
+                >
+                  自驾出行
+                </Text>
               </View>
             </View>
           </RadioGroup>
         </View>
 
-        {/* 协作选项 */}
-        <View className="setting-card" style={{ backgroundColor: '#F8FAFC' }}>
-          <View className="flex items-center justify-between">
-            <View className="flex items-center">
-              <Users size={18} color="#8B5CF6" />
-              <View className="ml-2">
-                <Text className="block text-sm font-medium text-foreground">邀请同伴协作</Text>
-                <Text className="block text-xs text-muted-foreground">分享路线给朋友投票选择</Text>
+        {/* 集合地点 */}
+        <View className="bg-white rounded-xl p-4 shadow-sm">
+          <View className="flex items-center mb-3">
+            <View className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Navigation size={16} color="#3b82f6" />
+            </View>
+            <Text className="block text-sm font-medium text-gray-900 ml-2">集合地点</Text>
+            <Text className="block text-xs text-gray-400 ml-auto">可选</Text>
+          </View>
+          
+          {/* 已选择地点 */}
+          {meetingPoint ? (
+            <View className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+              <View className="flex items-center flex-1">
+                <MapPin size={16} color="#10b981" />
+                <Text className="block text-sm text-green-700 ml-2 flex-1 truncate">
+                  {meetingPoint}
+                </Text>
+              </View>
+              <View 
+                className="p-1"
+                onClick={clearMeetingPoint}
+              >
+                <X size={16} color="#10b981" />
               </View>
             </View>
-            <Checkbox checked={false} />
-          </View>
+          ) : (
+            /* 搜索输入框 */
+            <View className="relative">
+              <View className="flex items-center bg-gray-50 rounded-lg px-3 py-2">
+                <Search size={16} color="#9ca3af" />
+                <Input
+                  className="flex-1 ml-2 text-sm bg-transparent"
+                  placeholder="输入集合地点名称"
+                  value={meetingPoint}
+                  onInput={(e: any) => setMeetingPoint(e.detail.value)}
+                  onBlur={() => {
+                    if (meetingPoint.trim()) {
+                      searchMeetingPoint(meetingPoint)
+                    }
+                  }}
+                />
+                {searching && (
+                  <Loader size={16} color="#3b82f6" className="animate-spin" />
+                )}
+              </View>
+
+              {/* 搜索结果列表 */}
+              {showSearch && searchResults.length > 0 && (
+                <View className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-100 z-50 max-h-48 overflow-y-auto">
+                  {searchResults.map((place, index) => (
+                    <View 
+                      key={index}
+                      className="px-3 py-3 border-b border-gray-50 last:border-b-0"
+                      onClick={() => selectMeetingPoint(place)}
+                    >
+                      <View className="flex items-start">
+                        <MapPin size={14} color="#64748b" className="mt-1" />
+                        <View className="ml-2 flex-1">
+                          <Text className="block text-sm text-gray-900">{place.name}</Text>
+                          {place.address && (
+                            <Text className="block text-xs text-gray-500 mt-1">{place.address}</Text>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* 点击外部关闭搜索结果 */}
+              {showSearch && (
+                <View 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => {
+                    setShowSearch(false)
+                    setSearchResults([])
+                  }}
+                />
+              )}
+            </View>
+          )}
+
+          {meetingCoords && (
+            <Text className="block text-xs text-gray-400 mt-2">
+              已定位：({meetingCoords.lat.toFixed(4)}, {meetingCoords.lng.toFixed(4)})
+            </Text>
+          )}
         </View>
 
       </View>
 
       {/* 底部操作栏 */}
-      <View className="fixed bottom-0 left-0 right-0 bg-background border-t border-border px-4 py-4 pb-8">
+      <View 
+        style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          backgroundColor: '#fff', borderTop: '1px solid #e5e5e5',
+          padding: '16px', paddingBottom: '32px', zIndex: 100
+        }}
+      >
         <Button 
-          className="w-full h-12 text-base font-medium"
+          className="w-full h-12 text-base font-medium bg-blue-500"
           onClick={handleGenerate}
           disabled={generating}
         >
           {generating ? (
             <>
-              <Sparkles size={18} color="#ffffff" className="mr-2 animate-pulse" />
-              规划中...
+              <Loader size={18} color="#ffffff" className="mr-2 animate-spin" />
+              <Text className="text-white">规划中...</Text>
             </>
           ) : (
             <>
-              生成路线
+              <Sparkles size={18} color="#ffffff" className="mr-2" />
+              <Text className="text-white">生成路线</Text>
               <ChevronRight size={18} color="#ffffff" className="ml-2" />
             </>
           )}
