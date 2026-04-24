@@ -488,26 +488,6 @@ export default function Index() {
       </View>
       )}
 
-      {/* 空状态 */}
-      {inspirations.length === 0 && !loading && (
-        <View className="flex flex-col items-center justify-center py-20 px-8">
-          <View className="w-20 h-20 bg-gradient-to-br from-blue-50 to-green-50 rounded-full flex items-center justify-center mb-4 border border-blue-100">
-            <Sparkles size={40} color="#3b82f6" />
-          </View>
-          <Text className="block text-lg font-semibold text-gray-900 mb-2">开始你的灵感收集</Text>
-          <Text className="block text-sm text-gray-500 text-center mb-6">
-            上方粘贴链接即可收录灵感{'\n'}支持短视频、票务平台、公众号文章
-          </Text>
-          <Button 
-            className="bg-gradient-to-r from-green-500 to-emerald-500"
-            onClick={() => Taro.pageScrollTo({ scrollTop: 0, duration: 300 })}
-          >
-            <Plus size={16} color="#fff" />
-            <Text className="text-white ml-2">去收录灵感</Text>
-          </Button>
-        </View>
-      )}
-
       {/* 底部操作栏 */}
       {inspirations.length > 0 && (
         <View className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-3 pb-8">
