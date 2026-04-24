@@ -191,8 +191,9 @@ export default function Index() {
     setPasting(true)
     try {
       console.log('[Paste] 开始预览，URL:', isUrl ? linkInput.trim() : '纯文字')
+      Taro.showLoading({ title: '正在提取灵感...' })
       
-      // 先预览多个灵感点
+      // 先预览多个灵感点（视频处理可能需要较长时间，设置120秒超时）
       const previewRes = await Network.request({
         url: '/api/trip/preview',
         method: 'POST',
@@ -200,9 +201,11 @@ export default function Index() {
           userId: userInfo?.id,
           url: isUrl ? linkInput.trim() : undefined,
           text: !isUrl ? linkInput.trim() : undefined
-        }
+        },
+        timeout: 120000  // 120秒超时
       })
       
+      Taro.hideLoading()
       console.log('[Paste] 预览响应:', JSON.stringify(previewRes))
       console.log('[Paste] previewRes.data:', JSON.stringify(previewRes?.data))
       
@@ -223,13 +226,20 @@ export default function Index() {
         setShowPreviewDialog(true)
         setLinkInput('')
       } else {
-        // 没有提取到灵感点，直接收录
+        // 没有提取到灵感点
         console.log('[Paste] 未能提取到灵感点:', JSON.stringify(previewRes.data))
         Taro.showToast({ title: previewRes.data?.message || '未能提取到灵感点', icon: 'none' })
       }
     } catch (error: any) {
+      Taro.hideLoading()
       console.error('[Paste] 预览失败:', error)
-      Taro.showToast({ title: '预览失败: ' + (error.message || '未知错误'), icon: 'none' })
+      // 区分超时错误和其他错误
+      const errorMsg = error.message || ''
+      if (errorMsg.includes('abort') || errorMsg.includes('timeout') || errorMsg.includes('超时')) {
+        Taro.showToast({ title: '请求超时，请重试或检查网络', icon: 'none' })
+      } else {
+        Taro.showToast({ title: '预览失败: ' + errorMsg, icon: 'none' })
+      }
     } finally {
       setPasting(false)
     }
