@@ -4,7 +4,8 @@ export interface Inspiration {
   title: string
   image: string
   source: 'xiaohongshu' | 'dazhong' | 'damai' | 'other' | string  // 支持更多来源
-  type: 'spot' | 'food' | 'show' | 'hotel'
+  primary_tag: '景点' | '美食' | string  // 一级标签
+  secondary_tag?: string  // 二级标签
   location_name?: string  // 地点名称（字符串格式）
   location?: {
     name: string

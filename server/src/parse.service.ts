@@ -6,34 +6,22 @@ import { AudioService } from './audio.service'
 import { VideoParseService } from './video-parse.service'
 import { execSync } from 'child_process'
 
-// 类型映射：中文 -> 英文
-const typeMap: Record<string, string> = {
-  '景点': 'spot',
-  'spot': 'spot',
-  '旅游': 'spot',
-  '游览': 'spot',
-  '美食': 'food',
-  'food': 'food',
-  '餐饮': 'food',
-  '吃': 'food',
-  '餐厅': 'food',
-  '演出': 'show',
-  'show': 'show',
-  '表演': 'show',
-  '演唱会': 'show',
-  '活动': 'show',
-  '酒店': 'hotel',
-  'hotel': 'hotel',
-  '住宿': 'hotel',
-  '民宿': 'hotel',
-  '客栈': 'hotel',
-  '视频': 'spot',  // 默认视频类型为景点
-  '默认': 'spot',
+// 类型映射：中文 -> 中文一级标签
+const primaryTagMap: Record<string, string> = {
+  '景点': '景点',
+  '景区': '景点',
+  '博物馆': '景点',
+  '美食': '美食',
+  '餐厅': '美食',
+  '小吃': '美食',
+  '饮品': '美食',
+  '咖啡': '美食',
+  '默认': '景点',
 }
 
-function normalizeType(type: string): string {
-  if (!type) return 'spot'
-  return typeMap[type] || 'spot'
+function normalizePrimaryTag(tag: string): string {
+  if (!tag) return '景点'
+  return primaryTagMap[tag] || tag || '景点'
 }
 
 // 解析后的灵感数据
@@ -41,7 +29,8 @@ export interface ParsedInspiration {
   name: string
   location: string
   time: string
-  type: string
+  primaryTag: string
+  secondaryTag: string
   price: string
   description: string
   source: string
@@ -174,7 +163,8 @@ export class ParseService {
         title: parsed.name,
         image: parsed.coverImage,
         source: parsed.source,
-        type: normalizeType(parsed.type),  // 转换类型为英文
+        primary_tag: normalizeType(parsed.primaryTag),  // 转换一级标签
+        secondary_tag: parsed.secondaryTag,  // 二级标签
         location: parsed.location,
         time: parsed.time,
         price: parsed.price,
@@ -599,13 +589,24 @@ ${content || '(无正文内容)'}
 
 这是一段旅行相关的视频字幕或文章内容，需要你从中挖掘出有价值的活动灵感。
 
-要求：
+## 标签体系（两级标签）
+
+**一级标签**（必须选择一项）：
+- 景点：景区、博物馆、公园、古迹、地标、展览等
+- 美食：餐厅、小吃、饮品、咖啡、甜点等
+
+**二级标签**（根据内容选择一项或多项）：
+- 景点类：景区、博物馆、公园/广场、古迹遗址、地标建筑、展览展馆、游乐场、动物园/植物园、网红打卡点、文化体验
+- 美食类：正餐（餐厅/酒楼）、小吃（街头美食/特色小吃）、饮品（奶茶/茶饮/果汁）、咖啡（咖啡店/茶馆）、甜点（蛋糕/冰淇淋/甜品）、烧烤/烧鸟、火锅、日料/韩料/西餐、面馆/粉店、早茶/下午茶
+
+## 要求
+
 1. 仔细阅读内容，识别出所有提到的具体活动、景点、美食店、演出等
-2. 每个灵感点需要包含：名称、类型、地点、时间、价格、描述
-3. 类型分为：景点、美食、演出/活动、酒店/住宿
+2. 每个灵感点必须包含：一级标签、二级标签、名称、地点、时间、价格、描述
+3. 标签选择要准确，不要生造标签
 4. 如果提到多个地点，都要提取出来
-5. 提取相关的标签（地点、类型、特色等）
-6. 每个灵感点描述要详细，包含为什么值得去
+5. 每个灵感点描述要详细，包含推荐理由和特色亮点
+6. 提取相关的标签（地点、类型、特色等）
 
 内容：
 ${title ? `标题：${title}\n` : ''}
@@ -619,7 +620,8 @@ ${content || '(无正文内容)'}
       "name": "灵感点名称",
       "location": "具体地址或地点",
       "time": "推荐时间/游览时长",
-      "type": "景点/美食/演出/活动/酒店",
+      "primaryTag": "景点/美食",
+      "secondaryTag": "博物馆/正餐/小吃/饮品/咖啡/等",
       "price": "人均/门票价格",
       "description": "详细描述：包含推荐理由、特色亮点等",
       "tags": ["地点", "类型", "特色标签"],
@@ -659,7 +661,8 @@ ${content || '(无正文内容)'}
         name: parsed.name || '未命名灵感',
         location: parsed.location || '',
         time: parsed.time || '',
-        type: parsed.type || '活动',
+        primaryTag: parsed.primaryTag || parsed.type || '景点',
+        secondaryTag: parsed.secondaryTag || '',
         price: parsed.price || '待定',
         description: parsed.description || '',
         source: '',
@@ -672,7 +675,8 @@ ${content || '(无正文内容)'}
         name: '未命名灵感',
         location: '',
         time: '',
-        type: '活动',
+        primaryTag: '景点',
+        secondaryTag: '',
         price: '待定',
         description: content.slice(0, 100),
         source: '',
@@ -689,7 +693,8 @@ ${content || '(无正文内容)'}
     title: string
     image?: string
     source?: string
-    type?: string
+    primary_tag?: string
+    secondary_tag?: string
     location?: string
     time?: string
     price?: string
@@ -704,7 +709,8 @@ ${content || '(无正文内容)'}
         title: input.title,
         image: input.image,
         source: input.source,
-        type: input.type,
+        primary_tag: input.primary_tag,
+        secondary_tag: input.secondary_tag,
         location_name: input.location,
         time: input.time,
         price: input.price,

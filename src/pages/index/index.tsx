@@ -15,13 +15,6 @@ import { Inspiration } from '@/types'
 import { Network } from '@/network'
 import './index.css'
 
-const typeConfig = {
-  spot: { color: '#3B82F6', label: '景点', icon: '🏛️' },
-  food: { color: '#F59E0B', label: '美食', icon: '🍜' },
-  show: { color: '#8B5CF6', label: '演出', icon: '🎭' },
-  hotel: { color: '#10B981', label: '住宿', icon: '🏨' }
-}
-
 const sourceConfig: Record<string, { color: string; label: string }> = {
   xiaohongshu: { color: '#FF2442', label: '小红书' },
   dazhong: { color: '#FF6600', label: '大众点评' },
@@ -34,13 +27,45 @@ interface InspirationPoint {
   name: string
   location: string
   time: string
-  type: string
+  primaryTag: string  // 一级标签：景点、美食
+  secondaryTag?: string  // 二级标签：正餐、小吃、饮品、咖啡等
   price: string
   description: string
   tags: string[]
   highlights?: string[]
   sourceUrl: string
   selected: boolean
+}
+
+// 两级标签配置
+const primaryTagConfig: Record<string, { label: string; icon: string; color: string }> = {
+  '景点': { label: '景点', icon: '🏛️', color: '#3b82f6' },
+  '美食': { label: '美食', icon: '🍜', color: '#f97316' },
+}
+
+const secondaryTagConfig: Record<string, { label: string; icon: string }> = {
+  // 景点类
+  '景区': { label: '景区', icon: '🏞️' },
+  '博物馆': { label: '博物馆', icon: '🏛️' },
+  '公园/广场': { label: '公园/广场', icon: '🌳' },
+  '古迹遗址': { label: '古迹遗址', icon: '🏯' },
+  '地标建筑': { label: '地标建筑', icon: '🗼' },
+  '展览展馆': { label: '展览展馆', icon: '🎨' },
+  '游乐场': { label: '游乐场', icon: '🎢' },
+  '动物园/植物园': { label: '动物园/植物园', icon: '🦁' },
+  '网红打卡点': { label: '网红打卡点', icon: '📸' },
+  '文化体验': { label: '文化体验', icon: '🎭' },
+  // 美食类
+  '正餐': { label: '正餐', icon: '🍽️' },
+  '小吃': { label: '小吃', icon: '🍢' },
+  '饮品': { label: '饮品', icon: '🥤' },
+  '咖啡': { label: '咖啡', icon: '☕' },
+  '甜点': { label: '甜点', icon: '🍰' },
+  '烧烤/烧鸟': { label: '烧烤/烧鸟', icon: '🍗' },
+  '火锅': { label: '火锅', icon: '🍲' },
+  '日料/韩料/西餐': { label: '日料/韩料/西餐', icon: '🍣' },
+  '面馆/粉店': { label: '面馆/粉店', icon: '🍜' },
+  '早茶/下午茶': { label: '早茶/下午茶', icon: '🍵' },
 }
 
 export default function Index() {
@@ -212,7 +237,8 @@ export default function Index() {
         user_id: userInfo?.id,
         title: point.name,
         source: 'xiaohongshu',
-        type: point.type,
+        primary_tag: point.primaryTag,
+        secondary_tag: point.secondaryTag,
         location_name: point.location,
         time: point.time,
         price: point.price,
@@ -279,14 +305,14 @@ export default function Index() {
   }
 
   // 全选/取消
-  const toggleAll = (type: 'spot' | 'food' | 'show' | 'hotel') => {
-    const typeIds = inspirations.filter(i => i.type === type).map(i => i.id)
-    const allSelected = typeIds.every(id => selectedIds.includes(id))
+  const toggleAll = (primaryTag: string) => {
+    const tagIds = inspirations.filter(i => i.primary_tag === primaryTag).map(i => i.id)
+    const allSelected = tagIds.every(id => selectedIds.includes(id))
     
     if (allSelected) {
-      setSelectedIds(prev => prev.filter(id => !typeIds.includes(id)))
+      setSelectedIds(prev => prev.filter(id => !tagIds.includes(id)))
     } else {
-      setSelectedIds(prev => [...new Set([...prev, ...typeIds])])
+      setSelectedIds(prev => [...new Set([...prev, ...tagIds])])
     }
   }
 
@@ -298,12 +324,10 @@ export default function Index() {
     window.location.href = '/pages/generate/index?selected=' + selectedIds.join(',')
   }
 
-  // 按类型分组
+  // 按一级标签分组
   const groupedInspirations = {
-    spot: inspirations.filter(i => i.type === 'spot'),
-    food: inspirations.filter(i => i.type === 'food'),
-    show: inspirations.filter(i => i.type === 'show'),
-    hotel: inspirations.filter(i => i.type === 'hotel')
+    '景点': inspirations.filter(i => i.primary_tag === '景点'),
+    '美食': inspirations.filter(i => i.primary_tag === '美食'),
   }
 
   // 未登录状态
@@ -388,24 +412,24 @@ export default function Index() {
       </View>
 
       {/* 灵感列表 */}
-      {(['spot', 'food', 'show', 'hotel'] as const).map(type => {
-        const items = groupedInspirations[type]
+      {['景点', '美食'].map(primaryTag => {
+        const items = groupedInspirations[primaryTag]
         if (items.length === 0) return null
         
-        const typeInfo = typeConfig[type]
+        const tagInfo = primaryTagConfig[primaryTag]
         const allSelected = items.every(i => selectedIds.includes(i.id))
         
         return (
-          <View key={type} className="mb-4">
+          <View key={primaryTag} className="mb-4">
             <View className="px-4 flex items-center justify-between mb-2">
               <View className="flex items-center">
-                <Text className="block mr-2">{typeInfo.icon}</Text>
-                <Text className="block text-base font-medium text-foreground">{typeInfo.label}</Text>
+                <Text className="block mr-2">{tagInfo.icon}</Text>
+                <Text className="block text-base font-medium text-foreground">{tagInfo.label}</Text>
                 <Badge variant="secondary" className="ml-2 text-xs">{items.length}</Badge>
               </View>
               <Text 
                 className="text-sm text-blue-500"
-                onClick={() => toggleAll(type)}
+                onClick={() => toggleAll(primaryTag)}
               >
                 {allSelected ? '取消' : '全选'}
               </Text>
@@ -427,16 +451,36 @@ export default function Index() {
                         {item.title}
                       </Text>
                       <View className="flex items-center gap-2 flex-wrap">
+                        {/* 一级标签 */}
                         <Badge 
-                          variant="secondary" 
+                          style={{ 
+                            backgroundColor: (primaryTagConfig[item.primary_tag]?.color || '#64748b') + '20',
+                            color: primaryTagConfig[item.primary_tag]?.color || '#64748b'
+                          }}
+                          className="text-xs"
+                        >
+                          {primaryTagConfig[item.primary_tag]?.icon || '📍'}{' '}
+                          {primaryTagConfig[item.primary_tag]?.label || item.primary_tag}
+                        </Badge>
+                        {/* 二级标签 */}
+                        {item.secondary_tag && (
+                          <Badge variant="secondary" className="text-xs">
+                            {secondaryTagConfig[item.secondary_tag]?.icon || ''}{' '}
+                            {secondaryTagConfig[item.secondary_tag]?.label || item.secondary_tag}
+                          </Badge>
+                        )}
+                        {/* 来源 */}
+                        <Badge 
+                          variant="outline" 
                           className="text-xs"
                           style={{ 
-                            backgroundColor: sourceConfig[item.source]?.color + '20',
-                            color: sourceConfig[item.source]?.color || '#64748B'
+                            backgroundColor: sourceConfig[item.source]?.color + '10',
+                            borderColor: sourceConfig[item.source]?.color || '#64748B'
                           }}
                         >
                           {sourceConfig[item.source]?.label || '其他'}
                         </Badge>
+                        {/* 地点 */}
                         {item.location_name && (
                           <View className="flex items-center gap-1">
                             <MapPin size={10} color="#6b7280" />
@@ -567,21 +611,32 @@ export default function Index() {
                   
                   {/* 内容 */}
                   <View className="flex-1">
-                    {/* 标题和类型 */}
-                    <View className="flex items-center gap-2 mb-2">
+                    {/* 标题和标签 */}
+                    <View className="flex items-center gap-2 mb-2 flex-wrap">
                       <Text className="block text-base font-medium text-gray-900 flex-1">
                         {point.name}
                       </Text>
+                      {/* 一级标签 */}
                       <Badge 
-                        variant="secondary" 
                         style={{ 
-                          backgroundColor: (typeConfig[point.type as keyof typeof typeConfig]?.color || '#64748b') + '20',
-                          color: typeConfig[point.type as keyof typeof typeConfig]?.color || '#64748b'
+                          backgroundColor: (primaryTagConfig[point.primaryTag]?.color || '#64748b') + '20',
+                          color: primaryTagConfig[point.primaryTag]?.color || '#64748b'
                         }}
+                        className="text-xs"
                       >
-                        {typeConfig[point.type as keyof typeof typeConfig]?.icon || '📍'}{' '}
-                        {typeConfig[point.type as keyof typeof typeConfig]?.label || '其他'}
+                        {primaryTagConfig[point.primaryTag]?.icon || '📍'}{' '}
+                        {primaryTagConfig[point.primaryTag]?.label || '其他'}
                       </Badge>
+                      {/* 二级标签 */}
+                      {point.secondaryTag && secondaryTagConfig[point.secondaryTag] && (
+                        <Badge 
+                          variant="secondary"
+                          className="text-xs"
+                        >
+                          {secondaryTagConfig[point.secondaryTag]?.icon || ''}{' '}
+                          {secondaryTagConfig[point.secondaryTag]?.label || point.secondaryTag}
+                        </Badge>
+                      )}
                     </View>
                     
                     {/* 地点和时间 */}
