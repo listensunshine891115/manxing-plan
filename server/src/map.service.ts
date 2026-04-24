@@ -206,7 +206,14 @@ export class MapService {
     const optimizedRoute = await this.nearestNeighborRoute(validPoints)
 
     // 计算相邻点之间的距离（使用实际道路距离）
-    const routeWithDistance = []
+    const routeWithDistance: Array<{
+      id: string
+      title: string
+      lat: number
+      lng: number
+      location: string
+      distance?: number
+    }> = []
     for (let index = 0; index < optimizedRoute.length; index++) {
       const point = optimizedRoute[index]
       const nextPoint = optimizedRoute[index + 1]
