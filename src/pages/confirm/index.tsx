@@ -3,6 +3,7 @@ import { View, Text } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Check, CalendarDays, MapPin, Loader } from 'lucide-react-taro'
 import Taro from '@tarojs/taro'
+import { Network } from '@/network'
 import './index.css'
 
 // 类型定义
@@ -89,11 +90,32 @@ export default function Confirm() {
 
     setConfirming(true)
     try {
-      // 跳转到行程图页面
-      Taro.navigateTo({ url: '/pages/route/index' })
+      // 调用后端 API 保存行程
+      const res = await Network.request({
+        url: '/api/trip/trips',
+        method: 'POST',
+        data: {
+          name: `行程-${routePlan.settings.startDate}`,
+          itinerary: routePlan.itinerary,
+          settings: routePlan.settings,
+          status: 'confirmed'
+        }
+      })
+
+      console.log('[POST] /api/trip/trips - Response:', res.data)
+
+      if (res.data && res.data.code === 200) {
+        // 清除缓存
+        await Taro.removeStorage({ key: 'routePlanResult' })
+        
+        // 跳转到个人行程页面
+        Taro.redirectTo({ url: '/pages/preview/index' })
+      } else {
+        throw new Error(res.data?.msg || '保存失败')
+      }
     } catch (error) {
       console.error('确认行程失败:', error)
-      Taro.showToast({ title: '确认失败', icon: 'none' })
+      Taro.showToast({ title: '保存失败，请重试', icon: 'none' })
       setConfirming(false)
     }
   }
