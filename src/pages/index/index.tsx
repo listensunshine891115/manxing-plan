@@ -131,28 +131,29 @@ export default function Index() {
   // 粘贴链接收录
   const handlePasteLink = async () => {
     if (!linkInput.trim()) {
-      Taro.showToast({ title: '请输入链接', icon: 'none' })
+      Taro.showToast({ title: '请输入链接或文字', icon: 'none' })
       return
     }
 
-    if (!linkInput.includes('http')) {
-      Taro.showToast({ title: '请输入有效的链接', icon: 'none' })
-      return
-    }
+    // 判断是链接还是纯文字
+    const isUrl = linkInput.includes('http://') || linkInput.includes('https://')
 
     setPasting(true)
     try {
       const res = await Network.request({
-        url: '/api/trip/add-inspiration',
+        url: '/api/trip/parse',
         method: 'POST',
         data: {
           userId: userInfo?.id,
-          url: linkInput.trim()
+          url: isUrl ? linkInput.trim() : undefined,
+          text: !isUrl ? linkInput.trim() : undefined
         }
       })
       
+      console.log('收录结果:', res.data)
+      
       if (res.data?.success) {
-        Taro.showToast({ title: '收录成功', icon: 'success' })
+        Taro.showToast({ title: res.data?.message || '收录成功', icon: 'success' })
         setLinkInput('')
         setShowPasteDialog(false)
         fetchInspirations()

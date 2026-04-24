@@ -1,9 +1,13 @@
 import { Controller, Get, Post, Delete, Body, Param, Query } from '@nestjs/common'
 import { TripService } from '@/trip.service'
+import { ParseService } from '@/parse.service'
 
 @Controller('trip')
 export class TripController {
-  constructor(private readonly tripService: TripService) {}
+  constructor(
+    private readonly tripService: TripService,
+    private readonly parseService: ParseService
+  ) {}
 
   // ==================== 灵感管理 ====================
 
@@ -15,12 +19,33 @@ export class TripController {
     return { code: 200, msg: 'success', data }
   }
 
-  // 添加灵感
+  // 添加灵感（支持链接解析和文字输入）
   @Post('inspirations')
-  async addInspiration(@Body() body: any) {
+  async addInspiration(@Body() body: { userId?: string; url?: string; text?: string }) {
     console.log(`[POST] /api/trip/inspirations - body:`, JSON.stringify(body))
-    const data = await this.tripService.addInspiration(body)
-    return { code: 200, msg: 'success', data }
+    
+    // 如果有 url 或 text，使用 ParseService 解析
+    if (body.url || body.text) {
+      const result = await this.parseService.parse(body.userId || '', {
+        url: body.url,
+        text: body.text
+      })
+      return { code: 200, msg: 'success', ...result }
+    }
+    
+    // 返回失败（因为缺少必要参数）
+    return { code: 400, msg: '请提供 url 或 text 参数' }
+  }
+
+  // 智能解析（专门用于粘贴灵感）
+  @Post('parse')
+  async parseInspiration(@Body() body: { userId: string; url?: string; text?: string }) {
+    console.log(`[POST] /api/trip/parse - userId: ${body.userId}`)
+    const result = await this.parseService.parse(body.userId, {
+      url: body.url,
+      text: body.text
+    })
+    return { code: 200, msg: 'success', ...result }
   }
 
   // 批量添加灵感

@@ -124,21 +124,23 @@ export class MessageController {
     try {
       console.log('[WeChat] 解析链接:', url)
       
-      const result = await this.parseService.parseShareUrl(url, userId)
+      const result = await this.parseService.parse(userId, { url })
       
-      const typeEmoji = {
-        spot: '🏛️',
-        food: '🍜',
-        show: '🎭',
-        hotel: '🏨'
-      }[result.type] || '📍'
+      const typeEmoji: Record<string, string> = {
+        '景点': '🏛️',
+        '美食': '🍜',
+        '演出': '🎭',
+        '活动': '🎪',
+        '商铺': '🏪'
+      }
+      const emoji = typeEmoji[result.data?.type] || '📍'
 
-      return this.replyText(wxOpenid || '', `${typeEmoji} 已收录！
+      return this.replyText(wxOpenid || '', `${emoji} 已收录！
 
-${result.title || title || '未知标题'}
+${result.data?.name || title || '未知标题'}
 
-类型：${result.typeName || result.type}
-来源：${result.sourceName || result.source}
+类型：${result.data?.type || '活动'}
+来源：${result.data?.source || '链接'}
 
 请打开小程序查看您的灵感库～`)
 
