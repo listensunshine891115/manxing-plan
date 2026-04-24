@@ -418,32 +418,71 @@ export class ParseService {
           if (fetchResult.success) {
             content = fetchResult.content || ''
             title = fetchResult.title || ''
+
+            // 如果没有获取到文本内容，但有图片，尝试 OCR
+            if (!content && fetchResult.imageUrls && fetchResult.imageUrls.length > 0) {
+              console.log(`[Parse] 没有文本内容，尝试从图片提取文字...`)
+              const ocrText = await this.extractTextFromImages(fetchResult.imageUrls)
+              if (ocrText) {
+                content = ocrText
+                console.log(`[Parse] OCR 成功提取 ${ocrText.length} 字符`)
+              }
+            }
           } else {
-            // 降级：尝试视频提取
-            console.log(`[Parse] previewMultiple 图文获取失败，尝试视频提取...`)
-            const subtitleResult = await this.extractVideoSubtitle(sourceUrl)
-            if (subtitleResult) {
-              content = subtitleResult
-              title = ''
-            } else {
-              // 降级1：尝试 yt-dlp
-              const ytDlpResult = await this.getVideoInfoWithYtDlp(sourceUrl)
-              if (ytDlpResult.success) {
-                content = ytDlpResult.description || ytDlpResult.title || ''
-                title = ytDlpResult.title || ''
+            // 降级1：尝试获取图片并进行 OCR
+            console.log(`[Parse] previewMultiple 图文获取失败，尝试 OCR...`)
+            const fetchResultForImages = await this.fetchUrl(sourceUrl)
+            if (fetchResultForImages.imageUrls && fetchResultForImages.imageUrls.length > 0) {
+              const ocrText = await this.extractTextFromImages(fetchResultForImages.imageUrls)
+              if (ocrText) {
+                console.log(`[Parse] OCR 成功提取 ${ocrText.length} 字符`)
+                content = ocrText
+                title = ''
               } else {
-                // 降级2：从输入文字中提取内容
-                if (input.text) {
-                  const textContent = this.extractTextFromInput(input.text)
+                // 降级2：尝试视频提取 → yt-dlp → 输入文字
+                console.log(`[Parse] previewMultiple OCR 失败，尝试视频提取...`)
+                const subtitleResult = await this.extractVideoSubtitle(sourceUrl)
+                if (subtitleResult) {
+                  content = subtitleResult
+                  title = ''
+                } else {
+                  const ytDlpResult = await this.getVideoInfoWithYtDlp(sourceUrl)
+                  if (ytDlpResult.success) {
+                    content = ytDlpResult.description || ytDlpResult.title || ''
+                    title = ytDlpResult.title || ''
+                  } else {
+                    // 降级3：使用输入文字
+                    const textContent = this.extractTextFromInput(input.text || input.url || '')
+                    if (textContent) {
+                      console.log(`[Parse] previewMultiple 全部失败，降级使用输入文字`)
+                      content = textContent
+                      title = ''
+                      sourceType = 'text'
+                    }
+                  }
+                }
+              }
+            } else {
+              // 降级2：尝试视频提取 → yt-dlp → 输入文字
+              console.log(`[Parse] previewMultiple 没有图片，尝试视频提取...`)
+              const subtitleResult = await this.extractVideoSubtitle(sourceUrl)
+              if (subtitleResult) {
+                content = subtitleResult
+                title = ''
+              } else {
+                const ytDlpResult = await this.getVideoInfoWithYtDlp(sourceUrl)
+                if (ytDlpResult.success) {
+                  content = ytDlpResult.description || ytDlpResult.title || ''
+                  title = ytDlpResult.title || ''
+                } else {
+                  // 降级3：使用输入文字
+                  const textContent = this.extractTextFromInput(input.text || input.url || '')
                   if (textContent) {
                     console.log(`[Parse] previewMultiple 全部失败，降级使用输入文字`)
                     content = textContent
                     title = ''
-                  } else {
-                    return { success: false, message: '无法获取内容' }
+                    sourceType = 'text'
                   }
-                } else {
-                  return { success: false, message: '无法获取内容' }
                 }
               }
             }
