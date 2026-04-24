@@ -284,31 +284,17 @@ export default function Index() {
 
       {/* 快捷入口 */}
       <View className="px-4 py-4">
-        <View className="flex gap-3">
-          <View 
-            className="flex-1 bg-white rounded-xl p-4 flex items-center gap-3"
-            onClick={() => window.location.href = '/pages/generate/index'}
-          >
-            <View className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-              <Calendar size={20} color="#3b82f6" />
-            </View>
-            <View className="flex-1">
-              <Text className="block text-sm font-medium text-gray-900">出行设置</Text>
-              <Text className="block text-xs text-gray-400">设置行程</Text>
-            </View>
+        <View className="bg-white rounded-xl p-4 flex items-center gap-3"
+          onClick={() => window.location.href = '/pages/generate/index'}
+        >
+          <View className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+            <Calendar size={20} color="#3b82f6" />
           </View>
-          <View 
-            className="flex-1 bg-white rounded-xl p-4 flex items-center gap-3"
-            onClick={() => setShowPasteDialog(true)}
-          >
-            <View className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-              <Link2 size={20} color="#10b981" />
-            </View>
-            <View className="flex-1">
-              <Text className="block text-sm font-medium text-gray-900">粘贴链接</Text>
-              <Text className="block text-xs text-gray-400">收录灵感</Text>
-            </View>
+          <View className="flex-1">
+            <Text className="block text-sm font-medium text-gray-900">出行设置</Text>
+            <Text className="block text-xs text-gray-400">设置行程日期和偏好</Text>
           </View>
+          <ChevronRight size={18} color="#9ca3af" />
         </View>
       </View>
 
@@ -388,11 +374,11 @@ export default function Index() {
           </View>
           <Text className="block text-base font-medium text-gray-900 mb-2">暂无灵感</Text>
           <Text className="block text-sm text-gray-400 text-center px-8 mb-4">
-            点击「粘贴链接」收录灵感
+            点击「粘贴灵感」收录{'\n'}短视频、票务平台、公众号文章&quot;链接&quot;
           </Text>
           <Button className="bg-blue-500" onClick={() => setShowPasteDialog(true)}>
             <Link2 size={16} color="#fff" />
-            <Text className="text-white ml-2">粘贴链接</Text>
+            <Text className="text-white ml-2">粘贴灵感</Text>
           </Button>
         </View>
       )}
@@ -414,20 +400,23 @@ export default function Index() {
         </View>
       )}
 
-      {/* 粘贴链接弹窗 */}
+      {/* 粘贴灵感弹窗 */}
       <Dialog open={showPasteDialog} onOpenChange={(open) => !open && setShowPasteDialog(false)}>
         <View className="p-6">
           <View className="text-center mb-4">
             <View className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <Link2 size={24} color="#10b981" />
             </View>
-            <Text className="block text-lg font-medium text-gray-900">粘贴链接</Text>
+            <Text className="block text-lg font-medium text-gray-900">粘贴灵感</Text>
+            <Text className="block text-sm text-gray-500 mt-1">
+              粘贴你的灵感短视频、票务平台、公众号文章&quot;链接&quot;，一键形成灵感库
+            </Text>
           </View>
           <View className="bg-gray-50 rounded-xl p-4 mb-4">
             <View className="mb-3">
               <Input 
                 className="w-full bg-white"
-                placeholder="粘贴分享链接..."
+                placeholder="粘贴链接..."
                 value={linkInput}
                 onInput={(e: any) => setLinkInput(e.target.value)}
               />
