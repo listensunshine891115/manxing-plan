@@ -209,26 +209,6 @@ export class ParseService {
             }
           }
         } else {
-                  return {
-                    success: true,
-                    data: {
-                      name: this.extractTextFromInput(input.url || input.text || ''),
-                      source: '社交平台',
-                      type: '图文',
-                      location_name: '',
-                      time: '',
-                      price: '',
-                      description: input.url || input.text || '',
-                      tags: [],
-                      original_url: url,
-                    },
-                    message: '已收录，但未能获取详细信息'
-                  }
-                }
-              }
-            }
-          }
-        } else {
           // 其他平台：用 fetch 获取内容
           const fetchResult = await this.fetchUrl(url)
           
@@ -340,12 +320,14 @@ export class ParseService {
       let sourceUrl = input.url || ''
       let sourceType: SourceType = 'article'
 
-      // 提取 URL
-      if (input.url) {
-        const extractedUrl = this.extractUrl(input.url || '')
+      // 提取 URL（优先从 url 字段提取，其次从 text 字段提取）
+      const textWithUrl = input.url || input.text || ''
+      if (textWithUrl) {
+        const extractedUrl = this.extractUrl(textWithUrl)
         if (extractedUrl) {
           sourceUrl = extractedUrl
           sourceType = this.detectSourceType(sourceUrl)
+          console.log(`[Parse] 检测到 URL: ${sourceUrl}, 类型: ${sourceType}`)
         } else {
           sourceUrl = ''
         }
@@ -397,8 +379,9 @@ export class ParseService {
             sourceUrl = realUrl
           }
 
-          // 先尝试 fetchUrl 获取图文内容和图片
+          // 获取图文内容和图片
           const fetchResult = await this.fetchUrl(sourceUrl)
+          console.log(`[Parse] previewMultiple fetchUrl 结果: success=${fetchResult.success}, content长度=${(fetchResult.content || '').length}, imageUrls数量=${(fetchResult.imageUrls || []).length}`)
           content = fetchResult.content || ''
           title = fetchResult.title || ''
 
@@ -417,27 +400,38 @@ export class ParseService {
             }
           }
 
-          // 如果仍然没有内容，降级处理
+          // 如果仍然没有内容，尝试降级处理
           if (!content) {
-            console.log(`[Parse] previewMultiple 图文获取失败，尝试视频提取...`)
-            const subtitleResult = await this.extractVideoSubtitle(sourceUrl)
-            if (subtitleResult) {
-              content = subtitleResult
-              title = ''
+            // 对于小红书图文链接，不要尝试视频提取（图文链接没有视频）
+            // 直接使用输入文字分析，并在结果中提示
+            const isXiaoHongShuArticle = sourceUrl.includes('xiaohongshu.com') && !sourceUrl.includes('/video/')
+            if (isXiaoHongShuArticle) {
+              console.log(`[Parse] previewMultiple 小红书图文链接，获取内容失败，将使用输入文字分析`)
             } else {
-              const ytDlpResult = await this.getVideoInfoWithYtDlp(sourceUrl)
-              if (ytDlpResult.success) {
-                content = ytDlpResult.description || ytDlpResult.title || ''
-                title = ytDlpResult.title || ''
+              console.log(`[Parse] previewMultiple 图文获取失败，尝试视频提取...`)
+              const subtitleResult = await this.extractVideoSubtitle(sourceUrl)
+              if (subtitleResult) {
+                content = subtitleResult
+                title = ''
               } else {
-                // 降级：使用输入文字
-                const textContent = this.extractTextFromInput(input.text || input.url || '')
-                if (textContent) {
-                  console.log(`[Parse] previewMultiple 全部失败，降级使用输入文字`)
-                  content = textContent
-                  title = ''
-                  sourceType = 'text'
+                const ytDlpResult = await this.getVideoInfoWithYtDlp(sourceUrl)
+                if (ytDlpResult.success) {
+                  content = ytDlpResult.description || ytDlpResult.title || ''
+                  title = ytDlpResult.title || ''
                 }
+              }
+            }
+            
+            // 如果仍然没有内容，使用输入文字
+            if (!content && input.text) {
+              const textContent = this.extractTextFromInput(input.text)
+              if (textContent) {
+                console.log(`[Parse] previewMultiple 降级使用输入文字`)
+                content = textContent
+                title = ''
+                sourceType = 'text'
+              } else {
+                return { success: false, message: '无法获取内容' }
               }
             }
           }
