@@ -466,7 +466,7 @@ export default function Generate() {
                 <Users size={16} color="#8b5cf6" />
               </View>
               <View className="ml-2">
-                <Text className="block text-sm font-medium text-gray-900">邀请同伴协作</Text>
+                <Text className="block text-sm font-medium text-gray-900">邀请同伴投票</Text>
                 <Text className="block text-xs text-gray-500">分享路线给朋友投票选择</Text>
               </View>
             </View>
@@ -504,10 +504,10 @@ export default function Generate() {
                     <Search size={16} color="#9ca3af" />
                     <Input
                       className="flex-1 ml-2 text-sm bg-transparent"
-                      placeholder="输入集合地点名称"
+                      placeholder="输入集合地点名称后回车搜索"
                       value={meetingPoint}
                       onInput={(e: any) => setMeetingPoint(e.detail.value)}
-                      onBlur={() => {
+                      onConfirm={() => {
                         if (meetingPoint.trim()) {
                           searchMeetingPoint(meetingPoint)
                         }
