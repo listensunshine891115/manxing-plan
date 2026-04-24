@@ -939,6 +939,7 @@ export class ParseService {
     title?: string
     coverImage?: string
     imageUrls?: string[]
+    relatedLinks?: string[]
     message?: string
   }> {
     let browser: playwright.Browser | null = null
@@ -976,14 +977,14 @@ export class ParseService {
       await page.goto(realUrl, { waitUntil: 'networkidle', timeout: 20000 })
       
       // 等待页面主要元素加载
-      await page.waitForTimeout(2000)
+      await page.waitForTimeout(3000)
       
       // 获取标题（店铺名称）
       const title = await page.title()
       console.log(`[Parse] 大众点评标题: ${title}`)
       
       // 获取页面主要内容
-      const content = await page.evaluate(() => {
+      let content = await page.evaluate(() => {
         // 尝试多种选择器获取店铺信息
         const selectors = [
           // 店铺信息区域
@@ -997,6 +998,9 @@ export class ParseService {
           '[class*="product"]', '[class*="deal"]',
           // 移动端特定
           '[class*="shop-base"]', '[class*="shopBase"]',
+          // feed 内容（UGC 内容）
+          '[class*="feed"]', '[class*="feedContent"]',
+          '[class*="ugc"]', '[class*="ugcContent"]',
         ]
         
         let mainContent = ''
@@ -1027,6 +1031,50 @@ export class ParseService {
       })
       
       console.log(`[Parse] 大众点评内容长度: ${content.length}`)
+      
+      // 提取页面中的店铺链接和店铺名称
+      const relatedShops = await page.evaluate(() => {
+        const shops: { name: string; url: string }[] = []
+        
+        // 查找所有链接
+        const links = document.querySelectorAll('a[href]')
+        links.forEach((link) => {
+          const href = link.getAttribute('href') || ''
+          const text = link.innerText?.trim() || ''
+          
+          // 只获取大众点评店铺相关的链接
+          if (href.includes('dianping.com') && text && text.length > 1 && text.length < 50) {
+            // 过滤掉导航链接等
+            if (!href.includes('/nav') && !href.includes('/city') && !href.includes('/login')) {
+              // 构造完整 URL
+              let fullUrl = href
+              if (href.startsWith('//')) {
+                fullUrl = 'https:' + href
+              } else if (href.startsWith('/')) {
+                fullUrl = 'https://www.dianping.com' + href
+              }
+              
+              shops.push({ name: text, url: fullUrl })
+            }
+          }
+        })
+        
+        // 去重
+        const uniqueShops = shops.filter((shop, index, self) => 
+          index === self.findIndex(s => s.name === shop.name || s.url === shop.url)
+        )
+        
+        return uniqueShops.slice(0, 10) // 最多取10个
+      })
+      
+      console.log(`[Parse] 提取到 ${relatedShops.length} 个相关店铺`)
+      
+      // 如果页面内容过短，但有相关店铺信息，尝试合并
+      if (content.length < 100 && relatedShops.length > 0) {
+        const shopNames = relatedShops.map(s => s.name).join('、')
+        content = `相关推荐店铺：${shopNames}。${content}`
+        console.log(`[Parse] 合并店铺名称到内容: ${shopNames}`)
+      }
       
       // 获取页面中的图片
       const imageUrls = await page.evaluate(() => {
@@ -1059,7 +1107,8 @@ export class ParseService {
         content,
         title,
         coverImage,
-        imageUrls
+        imageUrls,
+        relatedLinks: relatedShops.map(s => s.name)
       }
     } catch (error: any) {
       console.error(`[Parse] 大众点评 Playwright 获取失败:`, error.message)
