@@ -418,9 +418,48 @@ export default function Index() {
             <Text className="block text-xs text-gray-400 mt-1">记录美好旅程</Text>
           </View>
         </View>
-        <Text className="block text-sm text-gray-500">
-          共 {inspirations.length} 个灵感点 · 点击分类查看
-        </Text>
+
+        {/* 粘贴灵感输入区 */}
+        <View className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 mb-4 border border-green-100">
+          <View className="flex items-center mb-3">
+            <Link2 size={16} color="#10b981" />
+            <Text className="block text-sm font-medium text-green-700 ml-2">粘贴灵感</Text>
+          </View>
+          <View className="flex gap-2">
+            <View className="flex-1 bg-white rounded-lg px-3 py-2">
+              <Input 
+                className="w-full text-sm"
+                placeholder="粘贴链接或输入文字..."
+                value={linkInput}
+                onInput={(e: any) => setLinkInput(e.target.value)}
+              />
+            </View>
+            <Button 
+              className="bg-green-500 px-4"
+              onClick={handlePasteLink}
+              disabled={pasting}
+            >
+              <Text className="text-white text-sm">{pasting ? '收录中...' : '收录'}</Text>
+            </Button>
+          </View>
+          <Text 
+            className="block text-xs text-green-600 mt-2 text-center"
+            onClick={handlePasteFromClipboard}
+          >
+            一键粘贴剪贴板内容
+          </Text>
+        </View>
+
+        {/* 我的灵感点 */}
+        <View className="flex items-center justify-between">
+          <View className="flex items-center">
+            <Text className="block text-base font-semibold text-gray-900">我的灵感点</Text>
+            <Badge variant="secondary" className="ml-2 text-xs">
+              {inspirations.length} 个
+            </Badge>
+          </View>
+          <Text className="text-xs text-gray-400">点击分类查看</Text>
+        </View>
       </View>
 
       {/* 分类卡片 */}
@@ -441,7 +480,7 @@ export default function Index() {
                     <Text className="block text-2xl">{stat.icon}</Text>
                   </View>
                   <View>
-                    <Text className="block text-lg font-medium text-gray-900">
+                    <Text className="block text-base font-medium text-gray-900">
                       {stat.label}
                     </Text>
                     <Text className="block text-sm text-gray-500 mt-1">
@@ -456,17 +495,6 @@ export default function Index() {
         ))}
       </View>
 
-      {/* 粘贴灵感按钮 */}
-      <View className="px-4">
-        <Button 
-          className="w-full bg-green-500 hover:bg-green-600 border-0"
-          onClick={() => setShowPasteDialog(true)}
-        >
-          <Link2 size={18} color="#fff" />
-          <Text className="text-white ml-2">粘贴灵感</Text>
-        </Button>
-      </View>
-
       {/* 空状态 */}
       {inspirations.length === 0 && !loading && (
         <View className="flex flex-col items-center justify-center py-16">
@@ -475,7 +503,7 @@ export default function Index() {
           </View>
           <Text className="block text-base font-medium text-gray-900 mb-2">暂无灵感</Text>
           <Text className="block text-sm text-gray-400 text-center px-8">
-            点击「粘贴灵感」收录{'\n'}短视频、票务平台、公众号文章&quot;链接&quot;
+            上方粘贴链接即可收录灵感{'\n'}短视频、票务平台、公众号文章
           </Text>
         </View>
       )}
