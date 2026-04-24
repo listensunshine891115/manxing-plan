@@ -13,7 +13,9 @@ export namespace Network {
         if (url.startsWith('http://') || url.startsWith('https://')) {
             return url
         }
-        return `${PROJECT_DOMAIN}${url}`
+        // PROJECT_DOMAIN 可能是 undefined 或空字符串
+        const baseUrl = PROJECT_DOMAIN || ''
+        return `${baseUrl}${url}`
     }
 
     export const request: typeof Taro.request = option => {

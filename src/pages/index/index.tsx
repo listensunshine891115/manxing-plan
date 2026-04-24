@@ -208,18 +208,28 @@ export default function Index() {
       
       if (previewRes.data?.success && previewRes.data?.data?.inspirationPoints?.length > 0) {
         // 有关灵感点，展示让用户选择
-        setPreviewPoints(previewRes.data.data.inspirationPoints)
+        console.log('[Paste] 提取到灵感点数量:', previewRes.data.data.inspirationPoints.length)
+        
+        // 确保每个灵感点都有 selected 属性
+        const pointsWithSelected = previewRes.data.data.inspirationPoints.map((p: any) => ({
+          ...p,
+          selected: p.selected !== false // 默认选中
+        }))
+        
+        console.log('[Paste] 处理后的灵感点:', JSON.stringify(pointsWithSelected[0]))
+        
+        setPreviewPoints(pointsWithSelected)
         setShowPasteDialog(false)
         setShowPreviewDialog(true)
         setLinkInput('')
       } else {
         // 没有提取到灵感点，直接收录
-        console.log('[Paste] 未能提取到灵感点:', previewRes.data?.message)
+        console.log('[Paste] 未能提取到灵感点:', JSON.stringify(previewRes.data))
         Taro.showToast({ title: previewRes.data?.message || '未能提取到灵感点', icon: 'none' })
       }
     } catch (error: any) {
       console.error('[Paste] 预览失败:', error)
-      Taro.showToast({ title: '预览失败: ' + error.message, icon: 'none' })
+      Taro.showToast({ title: '预览失败: ' + (error.message || '未知错误'), icon: 'none' })
     } finally {
       setPasting(false)
     }
@@ -572,142 +582,157 @@ export default function Index() {
         </View>
       </Dialog>
 
-      {/* 预览灵感点弹窗 */}
-      <Dialog open={showPreviewDialog} onOpenChange={(open) => !open && setShowPreviewDialog(false)}>
-        <View className="p-4 max-h-[70vh] overflow-y-auto">
-          <View className="text-center mb-4">
-            <Text className="block text-lg font-medium text-gray-900">发现 {previewPoints.length} 个灵感点</Text>
-            <Text className="block text-sm text-gray-500 mt-1">选择你想要收录的灵感点</Text>
-          </View>
-          
-          {/* 全选 */}
-          <View className="flex items-center justify-between mb-3 px-2">
-            <View className="flex items-center gap-2">
-              <Checkbox 
-                checked={previewPoints.every(p => p.selected)}
-                onCheckedChange={toggleAllPreview}
-              />
-              <Text className="block text-sm text-gray-600">全选</Text>
-            </View>
-            <Text className="block text-sm text-blue-500">
-              已选 {previewPoints.filter(p => p.selected).length} 个
-            </Text>
-          </View>
-
-          {/* 灵感点列表 */}
-          <View className="space-y-3">
-            {previewPoints.map((point, index) => (
-              <View 
-                key={index}
-                className={`bg-gray-50 rounded-xl p-4 border-2 transition-all ${
-                  point.selected ? 'border-blue-500' : 'border-transparent'
-                }`}
-                onClick={() => togglePointSelected(index)}
-              >
-                <View className="flex gap-3">
-                  {/* 复选框 */}
-                  <View className="flex items-start pt-1">
-                    <Checkbox 
-                      checked={point.selected}
-                      onCheckedChange={() => togglePointSelected(index)}
-                    />
-                  </View>
-                  
-                  {/* 内容 */}
-                  <View className="flex-1">
-                    {/* 标题和标签 */}
-                    <View className="flex items-center gap-2 mb-2 flex-wrap">
-                      <Text className="block text-base font-medium text-gray-900 flex-1">
-                        {point.name}
-                      </Text>
-                      {/* 一级标签 */}
-                      <Badge 
-                        style={{ 
-                          backgroundColor: (primaryTagConfig[point.primaryTag]?.color || '#64748b') + '20',
-                          color: primaryTagConfig[point.primaryTag]?.color || '#64748b'
-                        }}
-                        className="text-xs"
-                      >
-                        {primaryTagConfig[point.primaryTag]?.icon || '📍'}{' '}
-                        {primaryTagConfig[point.primaryTag]?.label || '其他'}
-                      </Badge>
-                      {/* 二级标签 */}
-                      {point.secondaryTag && secondaryTagConfig[point.secondaryTag] && (
-                        <Badge 
-                          variant="secondary"
-                          className="text-xs"
-                        >
-                          {secondaryTagConfig[point.secondaryTag]?.icon || ''}{' '}
-                          {secondaryTagConfig[point.secondaryTag]?.label || point.secondaryTag}
-                        </Badge>
-                      )}
-                    </View>
-                    
-                    {/* 地点和时间 */}
-                    <View className="flex items-center gap-3 text-sm text-gray-500 mb-2">
-                      {point.location && (
-                        <View className="flex items-center gap-1">
-                          <MapPin size={12} color="#6b7280" />
-                          <Text className="block">{point.location}</Text>
-                        </View>
-                      )}
-                      {point.time && (
-                        <View className="flex items-center gap-1">
-                          <Calendar size={12} color="#6b7280" />
-                          <Text className="block">{point.time}</Text>
-                        </View>
-                      )}
-                    </View>
-                    
-                    {/* 价格 */}
-                    {point.price && point.price !== '待定' && (
-                      <Text className="block text-sm text-orange-500 mb-2">
-                        💰 {point.price}
-                      </Text>
-                    )}
-                    
-                    {/* 描述 */}
-                    <Text className="block text-sm text-gray-600 mb-2">
-                      {point.description}
-                    </Text>
-                    
-                    {/* 亮点标签 */}
-                    {(point.tags?.length > 0 || (point.highlights && point.highlights.length > 0)) && (
-                      <View className="flex flex-wrap gap-2">
-                        {(point.tags || []).slice(0, 4).map((tag, i) => (
-                          <Badge key={i} variant="outline" className="text-xs px-2 py-1">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </View>
-                    )}
-                    
-                    {/* 来源链接 */}
-                    {point.sourceUrl && (
-                      <Text className="block text-xs text-gray-400 mt-2 truncate">
-                        来源: {point.sourceUrl}
-                      </Text>
-                    )}
-                  </View>
+      {/* 预览灵感点弹窗 - 固定定位 */}
+      {showPreviewDialog && (
+        <View 
+          className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4"
+          onClick={() => setShowPreviewDialog(false)}
+        >
+          <View 
+            className="bg-white rounded-2xl w-full max-h-[80vh] flex flex-col"
+            style={{ maxWidth: '400px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 标题 */}
+            <View className="p-4 border-b border-gray-100 flex-shrink-0">
+              <View className="flex items-center justify-between">
+                <Text className="block text-lg font-medium text-gray-900">
+                  发现 {previewPoints.length} 个灵感点
+                </Text>
+                <View 
+                  onClick={() => setShowPreviewDialog(false)}
+                  className="w-8 h-8 flex items-center justify-center"
+                >
+                  <Text className="text-gray-400 text-xl">×</Text>
                 </View>
               </View>
-            ))}
-          </View>
+              <Text className="block text-sm text-gray-500 mt-1">选择你想要收录的灵感点</Text>
+            </View>
 
-          {/* 保存按钮 */}
-          <View className="mt-4">
-            <Button 
-              className="w-full bg-blue-500"
-              onClick={handleSaveSelected}
-              disabled={previewLoading}
-            >
-              <Text className="text-white">
-                {previewLoading ? '保存中...' : `收录 ${previewPoints.filter(p => p.selected).length} 个灵感点`}
+            {/* 全选 */}
+            <View className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+              <View className="flex items-center gap-2">
+                <Checkbox 
+                  checked={previewPoints.every(p => p.selected)}
+                  onCheckedChange={toggleAllPreview}
+                />
+                <Text className="block text-sm text-gray-600">全选</Text>
+              </View>
+              <Text className="block text-sm text-blue-500">
+                已选 {previewPoints.filter(p => p.selected).length} 个
               </Text>
-            </Button>
+            </View>
+
+            {/* 灵感点列表 */}
+            <View className="flex-1 overflow-y-auto p-4">
+              <View className="space-y-3">
+                {previewPoints.map((point, index) => (
+                  <View 
+                    key={index}
+                    className={`bg-gray-50 rounded-xl p-4 border-2 transition-all ${
+                      point.selected ? 'border-blue-500' : 'border-transparent'
+                    }`}
+                    onClick={() => togglePointSelected(index)}
+                  >
+                    <View className="flex gap-3">
+                      {/* 复选框 */}
+                      <View className="flex items-start pt-1">
+                        <Checkbox 
+                          checked={point.selected}
+                          onCheckedChange={() => togglePointSelected(index)}
+                        />
+                      </View>
+                      
+                      {/* 内容 */}
+                      <View className="flex-1">
+                        {/* 标题和标签 */}
+                        <View className="flex items-center gap-2 mb-2 flex-wrap">
+                          <Text className="block text-base font-medium text-gray-900 flex-1">
+                            {point.name}
+                          </Text>
+                          {/* 一级标签 */}
+                          <Badge 
+                            style={{ 
+                              backgroundColor: (primaryTagConfig[point.primaryTag]?.color || '#64748b') + '20',
+                              color: primaryTagConfig[point.primaryTag]?.color || '#64748b'
+                            }}
+                            className="text-xs"
+                          >
+                            {primaryTagConfig[point.primaryTag]?.icon || '📍'}{' '}
+                            {primaryTagConfig[point.primaryTag]?.label || '其他'}
+                          </Badge>
+                          {/* 二级标签 */}
+                          {point.secondaryTag && secondaryTagConfig[point.secondaryTag] && (
+                            <Badge 
+                              variant="secondary"
+                              className="text-xs"
+                            >
+                              {secondaryTagConfig[point.secondaryTag]?.icon || ''}{' '}
+                              {secondaryTagConfig[point.secondaryTag]?.label || point.secondaryTag}
+                            </Badge>
+                          )}
+                        </View>
+                        
+                        {/* 地点和时间 */}
+                        <View className="flex items-center gap-3 text-sm text-gray-500 mb-2">
+                          {point.location && (
+                            <View className="flex items-center gap-1">
+                              <MapPin size={12} color="#6b7280" />
+                              <Text className="block">{point.location}</Text>
+                            </View>
+                          )}
+                          {point.time && (
+                            <View className="flex items-center gap-1">
+                              <Calendar size={12} color="#6b7280" />
+                              <Text className="block">{point.time}</Text>
+                            </View>
+                          )}
+                        </View>
+                        
+                        {/* 价格 */}
+                        {point.price && point.price !== '待定' && (
+                          <Text className="block text-sm text-orange-500 mb-2">
+                            💰 {point.price}
+                          </Text>
+                        )}
+                        
+                        {/* 描述 */}
+                        <Text className="block text-sm text-gray-600 mb-2">
+                          {point.description}
+                        </Text>
+                        
+                        {/* 亮点标签 */}
+                        {(point.tags?.length > 0 || (point.highlights && point.highlights.length > 0)) && (
+                          <View className="flex flex-wrap gap-2">
+                            {(point.tags || []).slice(0, 4).map((tag, i) => (
+                              <Badge key={i} variant="outline" className="text-xs px-2 py-1">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* 保存按钮 */}
+            <View className="p-4 border-t border-gray-100 flex-shrink-0">
+              <Button 
+                className="w-full bg-blue-500"
+                onClick={handleSaveSelected}
+                disabled={previewLoading}
+              >
+                <Text className="text-white">
+                  {previewLoading ? '保存中...' : `收录 ${previewPoints.filter(p => p.selected).length} 个灵感点`}
+                </Text>
+              </Button>
+            </View>
           </View>
         </View>
-      </Dialog>
+      )}
     </View>
   )
 }

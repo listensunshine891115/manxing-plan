@@ -232,23 +232,50 @@ export class ParseService {
           if (subtitleResult) {
             content = subtitleResult
           } else {
-            // 降级：用 yt-dlp 获取信息
+            // 降级1：用 yt-dlp 获取信息
             const ytDlpResult = await this.getVideoInfoWithYtDlp(sourceUrl)
             if (ytDlpResult.success) {
               content = ytDlpResult.description || ytDlpResult.title || ''
               title = ytDlpResult.title || '未命名'
             } else {
-              return { success: false, message: '无法获取视频内容' }
+              // 降级2：尝试从输入文字中提取内容
+              if (input.text) {
+                const textContent = this.extractTextFromInput(input.text)
+                if (textContent) {
+                  console.log(`[Parse] 视频获取失败，降级使用输入文字`)
+                  content = textContent
+                  title = ''
+                  sourceType = 'text'
+                } else {
+                  return { success: false, message: '无法获取视频内容' }
+                }
+              } else {
+                return { success: false, message: '无法获取视频内容' }
+              }
             }
           }
         } else {
           // 其他类型：fetch 获取内容
           const fetchResult = await this.fetchUrl(sourceUrl)
           if (!fetchResult.success) {
-            return { success: false, message: fetchResult.message || '获取页面失败' }
+            // 降级1：尝试从输入文字中提取内容
+            if (input.text) {
+              const textContent = this.extractTextFromInput(input.text)
+              if (textContent) {
+                console.log(`[Parse] fetchUrl 失败，降级使用输入文字`)
+                content = textContent
+                title = ''
+                sourceType = 'text'
+              } else {
+                return { success: false, message: fetchResult.message || '获取页面失败' }
+              }
+            } else {
+              return { success: false, message: fetchResult.message || '获取页面失败' }
+            }
+          } else {
+            content = fetchResult.content || ''
+            title = fetchResult.title || ''
           }
-          content = fetchResult.content || ''
-          title = fetchResult.title || ''
         }
       } else if (input.text) {
         // 直接输入文字
@@ -308,9 +335,20 @@ export class ParseService {
     summary: string
   } {
     try {
+      // 尝试直接解析
       const jsonMatch = content.match(/\{[\s\S]*\}/)
       
       if (!jsonMatch) {
+        // 尝试修复 JSON 并重新解析
+        const fixedContent = this.fixJSON(content)
+        if (fixedContent) {
+          const parsed = JSON.parse(fixedContent)
+          return {
+            totalCount: parsed.totalCount || parsed.inspirationPoints?.length || 0,
+            inspirationPoints: parsed.inspirationPoints || [],
+            summary: parsed.summary || ''
+          }
+        }
         return {
           totalCount: 0,
           inspirationPoints: [],
@@ -326,12 +364,97 @@ export class ParseService {
         summary: parsed.summary || ''
       }
     } catch (error) {
-      console.error(`[Parse] 解析多个灵感点失败:`, error)
+      console.error(`[Parse] 解析多个灵感点失败，尝试容错:`, error)
+      
+      // 容错：尝试从文本中提取灵感点
+      const fallbackResult = this.extractInspirationPointsFallback(content)
+      if (fallbackResult.inspirationPoints.length > 0) {
+        return fallbackResult
+      }
+      
       return {
         totalCount: 0,
         inspirationPoints: [],
         summary: content.slice(0, 200) || '解析失败'
       }
+    }
+  }
+  
+  // 修复常见 JSON 格式问题
+  private fixJSON(content: string): string | null {
+    try {
+      // 移除 markdown 代码块标记
+      let fixed = content.replace(/```json\s*/gi, '').replace(/```\s*/gi, '')
+      
+      // 尝试找到 JSON 对象的开始和结束
+      const startIndex = fixed.indexOf('{')
+      const endIndex = fixed.lastIndexOf('}')
+      
+      if (startIndex === -1 || endIndex === -1) {
+        return null
+      }
+      
+      fixed = fixed.slice(startIndex, endIndex + 1)
+      
+      // 移除单引号，将 property 名用双引号包裹
+      // 简单的修复：移除尾部的多余文本
+      const lastValidIndex = fixed.lastIndexOf('}')
+      if (lastValidIndex < fixed.length - 1) {
+        fixed = fixed.slice(0, lastValidIndex + 1)
+      }
+      
+      // 尝试解析
+      JSON.parse(fixed)
+      return fixed
+    } catch {
+      return null
+    }
+  }
+  
+  // 从文本中提取灵感点的容错方法
+  private extractInspirationPointsFallback(content: string): {
+    totalCount: number
+    inspirationPoints: any[]
+    summary: string
+  } {
+    const points: any[] = []
+    
+    // 尝试匹配灵感点名称（常见的模式）
+    const namePatterns = [
+      /["']?name["']?\s*[:：]\s*["']([^"']+)["']/gi,
+      /^\d+[.、]\s*(.+?)(?=\n|$)/gm,
+      /【([^】]+)】/g,
+    ]
+    
+    for (const pattern of namePatterns) {
+      let match
+      while ((match = pattern.exec(content)) !== null) {
+        const name = match[1].trim()
+        if (name && name.length > 2 && name.length < 50) {
+          points.push({
+            name,
+            location: '',
+            time: '',
+            primaryTag: '景点',
+            secondaryTag: '网红打卡点',
+            price: '',
+            description: name,
+            tags: [],
+            highlights: [],
+            sourceUrl: '',
+            selected: true
+          })
+        }
+      }
+    }
+    
+    // 提取摘要（取前200字符）
+    const summary = content.replace(/\n+/g, ' ').slice(0, 200)
+    
+    return {
+      totalCount: points.length,
+      inspirationPoints: points.slice(0, 10), // 最多返回10个
+      summary
     }
   }
 
