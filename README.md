@@ -761,3 +761,86 @@ create(@Body() body: unknown) {
   return this.userService.create(result.data);
 }
 ```
+
+## 视频字幕提取服务 (ASR)
+
+本项目支持从抖音、小红书等视频平台提取字幕，识别地点和活动信息。
+
+### 技术方案
+
+| 方案 | 成本 | 说明 |
+|------|------|------|
+| **百度 ASR** | 免费（每日 10 万次） | 主方案 |
+| **讯飞 ASR** | 免费（每日 10 万次） | 备用方案 |
+
+### 工作流程
+
+```
+用户粘贴链接 → yt-dlp 下载视频 → ffmpeg 提取音频 → ASR 转文字 → LLM 提取地点
+```
+
+### 环境变量配置
+
+在 `server/.env` 中配置：
+
+```sh
+## 百度 ASR（主方案）
+BAIDU_ASR_APP_ID=你的AppID
+BAIDU_ASR_API_KEY=你的APIKey
+BAIDU_ASR_SECRET_KEY=你的SecretKey
+
+## 讯飞 ASR（备用方案）
+XUNFEI_ASR_APP_ID=你的AppID
+XUNFEI_ASR_API_KEY=你的APIKey
+XUNFEI_ASR_API_SECRET=你的APISecret
+```
+
+### 获取 API 密钥
+
+#### 百度 ASR
+
+1. 访问 [百度智能云控制台](https://cloud.baidu.com/)
+2. 搜索「语音识别」并开通服务
+3. 创建应用，获取 AppID、API Key、Secret Key
+
+#### 讯飞 ASR
+
+1. 访问 [讯飞开放平台](https://www.xfyun.cn/)
+2. 搜索「语音转写」并开通服务
+3. 创建应用，获取 AppID、API Key、API Secret
+
+### 依赖安装
+
+视频字幕提取需要 yt-dlp 和 ffmpeg：
+
+```bash
+# 安装 yt-dlp
+pip install yt-dlp
+
+# 安装 ffmpeg（macOS）
+brew install ffmpeg
+
+# 安装 ffmpeg（Ubuntu/Debian）
+sudo apt install ffmpeg
+
+# 安装 ffmpeg（Windows）
+# 下载 https://ffmpeg.org/download.html
+```
+
+### 服务状态检查
+
+访问健康检查接口查看 ASR 配置状态：
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+响应示例：
+```json
+{
+  "asr": {
+    "baidu": true,
+    "xunfei": false
+  }
+}
+```

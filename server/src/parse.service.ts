@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { FetchClient, LLMClient, Config } from 'coze-coding-dev-sdk'
 import { getSupabaseClient } from '@/storage/database/supabase-client'
+import { AsrService } from './asr.service'
+import { AudioService } from './audio.service'
+import { VideoParseService } from './video-parse.service'
 
 // 解析后的灵感数据
 export interface ParsedInspiration {
@@ -27,15 +30,20 @@ export class ParseService {
 
   private fetchClient: FetchClient
   private llmClient: LLMClient
+  private videoParseService: VideoParseService
 
-  // GPU 服务器地址（AutoDL）
+  // GPU 服务器地址（AutoDL - 已废弃，使用本地 ASR）
   private gpuServerUrl = process.env.GPU_SERVER_URL
 
-  constructor() {
+  constructor(
+    private readonly asrService: AsrService,
+    private readonly audioService: AudioService,
+  ) {
     const config = new Config()
     
     this.fetchClient = new FetchClient(config)
     this.llmClient = new LLMClient(config)
+    this.videoParseService = new VideoParseService(this.audioService, this.asrService)
   }
 
   // 主解析入口
@@ -134,38 +142,23 @@ export class ParseService {
     }
   }
 
-  // 从 GPU 服务器提取视频字幕
+  // 使用本地 ASR 服务提取视频字幕（百度/讯飞）
   private async extractVideoSubtitle(url: string): Promise<string | null> {
-    if (!this.gpuServerUrl) {
-      console.log(`[Parse] GPU 服务器未配置，跳过字幕提取`)
-      return null
-    }
-
     try {
-      console.log(`[Parse] 调用 GPU 服务提取字幕: ${url}`)
+      console.log(`[Parse] 使用本地 ASR 服务提取字幕: ${url}`)
 
-      const response = await fetch(`${this.gpuServerUrl}/extract`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, use_cache: true })
-      })
+      // 使用 VideoParseService 提取字幕
+      const result = await this.videoParseService.extractTextFromVideo(url)
 
-      if (!response.ok) {
-        console.error(`[Parse] GPU 服务返回错误: ${response.status}`)
-        return null
+      if (result.success && result.text) {
+        console.log(`[Parse] 字幕提取成功，长度: ${result.text.length}`)
+        return result.text
       }
 
-      const data = await response.json()
-      
-      if (data.success && data.subtitles) {
-        console.log(`[Parse] 字幕提取成功，长度: ${data.subtitles.length}`)
-        return data.subtitles
-      }
-
-      console.log(`[Parse] 字幕提取失败: ${data.error}`)
+      console.log(`[Parse] 字幕提取失败: ${result.error}`)
       return null
     } catch (error: any) {
-      console.error(`[Parse] 调用 GPU 服务失败:`, error)
+      console.error(`[Parse] 字幕提取失败:`, error)
       return null
     }
   }

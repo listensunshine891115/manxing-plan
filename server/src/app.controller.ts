@@ -1,9 +1,13 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from '@/app.service';
+import { AsrService } from '@/asr.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    private readonly appService: AppService,
+    private readonly asrService: AsrService,
+  ) {}
 
   @Get('hello')
   getHello(): { status: string; data: string } {
@@ -14,10 +18,10 @@ export class AppController {
   }
 
   @Get('health')
-  getHealth(): { status: string; data: string } {
+  getHealth(): { status: string; asr: { baidu: boolean; xunfei: boolean } } {
     return {
       status: 'success',
-      data: new Date().toISOString(),
+      asr: this.asrService.getConfigStatus(),
     };
   }
 }

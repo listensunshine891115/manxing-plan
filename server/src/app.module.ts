@@ -6,10 +6,21 @@ import { TripService } from '@/trip.service'
 import { MessageController } from '@/message.controller'
 import { ParseService } from '@/parse.service'
 import { UserService } from '@/user.service'
+import { AsrService } from '@/asr.service'
+import { AudioService } from '@/audio.service'
+import { VideoParseService } from '@/video-parse.service'
 
 @Module({
   imports: [],
   controllers: [AppController, TripController, MessageController],
-  providers: [AppService, TripService, ParseService, UserService],
+  providers: [
+    AppService,
+    TripService,
+    ParseService,
+    UserService,
+    AsrService,
+    AudioService,
+    VideoParseService,
+  ],
 })
 export class AppModule {}
