@@ -560,12 +560,10 @@ export class ParseService {
   private detectSourceType(url: string): SourceType {
     const lowerUrl = url.toLowerCase()
     
-    // 一类：社交短视频平台
+    // 一类：社交短视频平台（不包括小红书，因为小红书主要是图文）
     if (
       lowerUrl.includes('douyin.com') ||
       lowerUrl.includes('v.douyin') ||
-      lowerUrl.includes('xiaohongshu.com') ||
-      lowerUrl.includes('xhslink.com') ||
       lowerUrl.includes('bilibili.com') ||
       lowerUrl.includes('b23.tv') ||
       lowerUrl.includes('kuaishou.com') ||
@@ -574,6 +572,14 @@ export class ParseService {
       lowerUrl.includes('weibo.com')
     ) {
       return 'video'
+    }
+    
+    // 小红书：图文/文章类型
+    if (
+      lowerUrl.includes('xiaohongshu.com') ||
+      lowerUrl.includes('xhslink.com')
+    ) {
+      return 'article'
     }
     
     // 二类：票务平台
