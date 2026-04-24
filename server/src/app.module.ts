@@ -5,10 +5,11 @@ import { TripController } from '@/trip.controller'
 import { TripService } from '@/trip.service'
 import { MessageController } from '@/message.controller'
 import { ParseService } from '@/parse.service'
+import { UserService } from '@/user.service'
 
 @Module({
   imports: [],
   controllers: [AppController, TripController, MessageController],
-  providers: [AppService, TripService, ParseService],
+  providers: [AppService, TripService, ParseService, UserService],
 })
 export class AppModule {}

@@ -1,6 +1,25 @@
 import { pgTable, serial, timestamp, varchar, jsonb, integer, index, boolean } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
+// 用户表 - 存储微信用户信息
+export const users = pgTable(
+  "users",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+    openid: varchar("openid", { length: 64 }).unique(), // 微信 openid
+    unionid: varchar("unionid", { length: 64 }), // 微信 unionid
+    nickname: varchar("nickname", { length: 50 }), // 昵称
+    avatar: varchar("avatar", { length: 500 }), // 头像
+    user_code: varchar("user_code", { length: 10 }).unique(), // 用户码，用于消息关联
+    create_time: timestamp("create_time", { withTimezone: true }).defaultNow().notNull(),
+    update_time: timestamp("update_time", { withTimezone: true }),
+  },
+  (table) => [
+    index("users_openid_idx").on(table.openid),
+    index("users_user_code_idx").on(table.user_code),
+  ]
+)
+
 // 灵感表 - 存储用户收藏的旅行灵感
 export const inspirations = pgTable(
   "inspirations",
