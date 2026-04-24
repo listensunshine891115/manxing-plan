@@ -4,7 +4,7 @@ import Taro from '@tarojs/taro'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Network } from '@/network'
-import { MapPin, Utensils, Plus, ChevronRight } from 'lucide-react-taro'
+import { MapPin, Utensils, Plus, Route } from 'lucide-react-taro'
 import './index.config'
 
 interface CategoryCount {
@@ -17,18 +17,16 @@ export default function Index() {
   const [categoryCounts, setCategoryCounts] = useState<CategoryCount[]>([])
 
   useEffect(() => {
-    // 初始化用户信息
     const info = Taro.getStorageSync('userInfo')
     if (info?.id) {
       setUserInfo(info)
       fetchCategoryCounts()
     } else {
-      // 创建临时用户
       createTempUser()
     }
   }, [])
 
-  const createTempUser = async () => {
+  const createTempUser = () => {
     const tempId = `user_${Date.now()}`
     const tempUser = { id: tempId, name: '旅行者', avatar: '' }
     Taro.setStorageSync('userInfo', tempUser)
@@ -55,6 +53,8 @@ export default function Index() {
     return found?.count || 0
   }
 
+  const totalCount = categoryCounts.reduce((sum, c) => sum + c.count, 0)
+
   const handleCategoryClick = (tag: string) => {
     Taro.navigateTo({
       url: `/pages/category/index?tag=${encodeURIComponent(tag)}`
@@ -62,7 +62,7 @@ export default function Index() {
   }
 
   return (
-    <View className="min-h-screen bg-gray-50">
+    <View className="min-h-screen bg-gray-50 pb-28">
       {/* 顶部标题 */}
       <View className="bg-white px-4 pt-12 pb-4">
         <Text className="block text-2xl font-bold text-gray-900">
@@ -95,7 +95,6 @@ export default function Index() {
                   </Text>
                 </View>
               </View>
-              <ChevronRight size={24} color="rgba(255,255,255,0.6)" />
             </View>
           </CardContent>
         </Card>
@@ -120,28 +119,34 @@ export default function Index() {
                   </Text>
                 </View>
               </View>
-              <ChevronRight size={24} color="rgba(255,255,255,0.6)" />
             </View>
           </CardContent>
         </Card>
       </View>
 
-      {/* 底部提示 */}
-      <View className="px-4 py-8 text-center">
-        <Text className="block text-xs text-gray-400">
-          点击分类卡片查看详情
-        </Text>
-      </View>
-
-      {/* 收录按钮 */}
-      <View className="fixed bottom-4 left-4 right-4">
-        <Button 
-          onClick={() => Taro.navigateTo({ url: '/pages/category/index?tag=景点' })}
-          className="w-full bg-gray-900 hover:bg-gray-800 text-white"
-        >
-          <Plus size={18} color="#FFFFFF" className="mr-1" />
-          <Text className="block">收录灵感</Text>
-        </Button>
+      {/* 底部固定按钮 */}
+      <View className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-6">
+        <View className="flex gap-3">
+          <View style={{ flex: 1 }}>
+            <Button 
+              onClick={() => Taro.navigateTo({ url: '/pages/category/index?tag=景点' })}
+              className="w-full bg-gray-900 hover:bg-gray-800 text-white"
+            >
+              <Plus size={18} color="#FFFFFF" className="mr-1" />
+              <Text className="block">收录灵感</Text>
+            </Button>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button 
+              onClick={() => Taro.navigateTo({ url: '/pages/select/index' })}
+              disabled={totalCount === 0}
+              className={`w-full ${totalCount > 0 ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300'} text-white`}
+            >
+              <Route size={18} color="#FFFFFF" className="mr-1" />
+              <Text className="block">规划路线</Text>
+            </Button>
+          </View>
+        </View>
       </View>
     </View>
   )
