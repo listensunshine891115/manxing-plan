@@ -3,6 +3,7 @@ export default defineAppConfig({
     'pages/index/index',
     'pages/category/index',
     'pages/select/index',
+    'pages/favorites/index',
     'pages/bind-guide/index',
     'pages/settings/index',
     'pages/generate/index',

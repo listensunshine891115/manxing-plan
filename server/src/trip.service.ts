@@ -104,6 +104,28 @@ export class TripService {
     return { success: true }
   }
 
+  // 切换收藏状态
+  async toggleFavorite(id: string, isFavorite: boolean) {
+    const { error } = await this.client
+      .from('inspirations')
+      .update({ is_favorite: isFavorite })
+      .eq('id', id)
+    if (error) throw new Error(`更新收藏状态失败: ${error.message}`)
+    return { success: true }
+  }
+
+  // 获取收藏列表
+  async getFavorites(userId: string) {
+    const { data, error } = await this.client
+      .from('inspirations')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_favorite', true)
+      .order('create_time', { ascending: false })
+    if (error) throw new Error(`获取收藏列表失败: ${error.message}`)
+    return data
+  }
+
   // 批量添加灵感
   async batchAddInspirations(inputs: InspirationInput[]) {
     console.log(`[TripService] batchAddInspirations - 准备插入 ${inputs.length} 条记录`)

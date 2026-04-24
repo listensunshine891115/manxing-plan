@@ -1,0 +1,44 @@
+// 两级标签配置
+export const primaryTagConfig: Record<string, { label: string; icon: string; color: string; bgColor: string }> = {
+  '景点': { label: '景点', icon: '🏛️', color: '#3b82f6', bgColor: '#dbeafe' },
+  '美食': { label: '美食', icon: '🍜', color: '#f97316', bgColor: '#ffedd5' },
+  '购物': { label: '购物', icon: '🛍️', color: '#ec4899', bgColor: '#fce7f3' },
+  '活动': { label: '活动', icon: '🎭', color: '#8b5cf6', bgColor: '#ede9fe' },
+}
+
+// 二级标签配置
+export const secondaryTagConfig: Record<string, string> = {
+  // 景点类
+  '景区': '景点',
+  '博物馆': '景点',
+  '公园': '景点',
+  '广场': '景点',
+  '古迹': '景点',
+  '地标': '景点',
+  '网红打卡': '景点',
+  '网红打卡点': '景点',
+  '打卡点': '景点',
+  // 美食类
+  '正餐': '美食',
+  '小吃': '美食',
+  '饮品': '美食',
+  '咖啡': '美食',
+  '甜点': '美食',
+  '甜点店': '美食',
+  '烧烤': '美食',
+  '火锅': '美食',
+  '日料': '美食',
+  '面馆': '美食',
+  // 购物类
+  '商场': '购物',
+  '市集': '购物',
+  '潮牌': '购物',
+  '文创': '购物',
+  // 活动类
+  '展览': '活动',
+  '展览展馆': '活动',
+  '演出': '活动',
+  '音乐': '活动',
+  '戏剧': '活动',
+  '体育': '活动',
+}

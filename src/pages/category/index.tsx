@@ -2,29 +2,16 @@ import { useState, useEffect } from 'react'
 import { View, Text } from '@tarojs/components'
 import { Input } from '@/components/ui/input'
 import Taro, { useRouter } from '@tarojs/taro'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Network } from '@/network'
-import { MapPin, Clock, DollarSign, Trash2, Plus, ArrowLeft } from 'lucide-react-taro'
+import { InspirationCard, InspirationItem } from '@/components/inspiration-card'
+import { Plus, ArrowLeft, Sparkles } from 'lucide-react-taro'
 import './index.config'
-
-interface InspirationPoint {
-  id: string
-  title: string
-  primary_tag: string
-  secondary_tag: string
-  location_name: string
-  time: string
-  price: string
-  description: string
-  original_url: string
-  tags: string[]
-}
 
 const CategoryPage = () => {
   const router = useRouter()
-  const [inspirations, setInspirations] = useState<InspirationPoint[]>([])
+  const [inspirations, setInspirations] = useState<InspirationItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [linkInput, setLinkInput] = useState('')
@@ -32,10 +19,6 @@ const CategoryPage = () => {
 
   // 获取一级标签（景点/美食）作为页面参数
   const primaryTag = router.params.tag || '景点'
-  const isSpot = primaryTag === '景点'
-  const bgColor = isSpot ? 'bg-blue-50' : 'bg-orange-50'
-  const tagColor = isSpot ? 'text-blue-600' : 'text-orange-600'
-  const tagBgColor = isSpot ? 'bg-blue-100' : 'bg-orange-100'
 
   useEffect(() => {
     fetchCategoryInspirations()
@@ -61,6 +44,10 @@ const CategoryPage = () => {
   }
 
   const handleDelete = async (id: string) => {
+    if (id === 'refresh') {
+      fetchCategoryInspirations()
+      return
+    }
     Taro.showModal({
       title: '确认删除',
       content: '确定要删除这个灵感点吗？',
@@ -79,6 +66,24 @@ const CategoryPage = () => {
         }
       }
     })
+  }
+
+  // 处理收藏
+  const handleFavorite = async (id: string, isFavorite: boolean) => {
+    try {
+      await Network.request({
+        url: `/api/trip/inspirations/${id}/favorite`,
+        method: 'POST',
+        data: { isFavorite }
+      })
+      Taro.showToast({ 
+        title: isFavorite ? '已收藏' : '已取消收藏', 
+        icon: 'success' 
+      })
+      fetchCategoryInspirations()
+    } catch {
+      Taro.showToast({ title: '操作失败', icon: 'none' })
+    }
   }
 
   const handleAddByLink = async () => {
@@ -168,7 +173,7 @@ const CategoryPage = () => {
         <Text className="block text-lg font-semibold text-gray-900 ml-2">
           {primaryTag}
         </Text>
-        <Badge className={`ml-auto ${tagBgColor} ${tagColor}`}>
+        <Badge variant="secondary" className="ml-auto">
           {inspirations.length} 个
         </Badge>
       </View>
@@ -180,8 +185,8 @@ const CategoryPage = () => {
         </View>
       ) : inspirations.length === 0 ? (
         <View className="flex flex-col items-center justify-center py-20 px-4">
-          <View className={`w-20 h-20 rounded-full ${bgColor} flex items-center justify-center mb-4`}>
-            <MapPin size={40} color={isSpot ? '#3B82F6' : '#F59E0B'} />
+          <View className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+            <Sparkles size={40} color="#9ca3af" />
           </View>
           <Text className="block text-gray-600 text-center mb-2">
             还没有{primaryTag}灵感点
@@ -197,53 +202,18 @@ const CategoryPage = () => {
       ) : (
         <View className="p-4 space-y-3">
           {inspirations.map((item) => (
-            <Card key={item.id} className="bg-white">
-              <CardContent className="p-4">
-                <View className="flex justify-between items-start">
-                  <View className="flex-1">
-                    <Text className="block text-base font-medium text-gray-900 mb-2">
-                      {item.title}
-                    </Text>
-                    <Badge className={`${tagBgColor} ${tagColor} mb-2`}>
-                      {item.secondary_tag || primaryTag}
-                    </Badge>
-                  </View>
-                  <View 
-                    onClick={() => handleDelete(item.id)}
-                    className="p-2 -mr-2 -mt-1"
-                  >
-                    <Trash2 size={18} color="#9CA3AF" />
-                  </View>
-                </View>
-                
-                {item.description && (
-                  <Text className="block text-sm text-gray-500 mb-3 line-clamp-2">
-                    {item.description}
-                  </Text>
-                )}
-                
-                <View className="flex flex-wrap gap-3 text-xs text-gray-400">
-                  {item.location_name && (
-                    <View className="flex items-center">
-                      <MapPin size={12} color="#9CA3AF" className="mr-1" />
-                      <Text className="block">{item.location_name}</Text>
-                    </View>
-                  )}
-                  {item.time && (
-                    <View className="flex items-center">
-                      <Clock size={12} color="#9CA3AF" className="mr-1" />
-                      <Text className="block">{item.time}</Text>
-                    </View>
-                  )}
-                  {item.price && (
-                    <View className="flex items-center">
-                      <DollarSign size={12} color="#9CA3AF" className="mr-1" />
-                      <Text className="block">{item.price}</Text>
-                    </View>
-                  )}
-                </View>
-              </CardContent>
-            </Card>
+            <InspirationCard
+              key={item.id}
+              item={item}
+              onDelete={handleDelete}
+              onFavorite={handleFavorite}
+              onClick={() => {
+                if (item.original_url) {
+                  Taro.setClipboardData({ data: item.original_url })
+                  Taro.showToast({ title: '链接已复制', icon: 'success' })
+                }
+              }}
+            />
           ))}
         </View>
       )}
@@ -253,7 +223,7 @@ const CategoryPage = () => {
         <View className="fixed bottom-4 left-4 right-4">
           <Button 
             onClick={() => setShowAddDialog(true)}
-            className={`w-full ${isSpot ? 'bg-blue-500 hover:bg-blue-600' : 'bg-orange-500 hover:bg-orange-600'} text-white`}
+            className="w-full bg-blue-500 hover:bg-blue-600 text-white"
           >
             <Plus size={18} color="#FFFFFF" className="mr-1" />
             <Text className="block">收录更多{primaryTag}</Text>
@@ -293,7 +263,7 @@ const CategoryPage = () => {
                 <Button 
                   onClick={handleAddByLink}
                   disabled={adding}
-                  className={`w-full ${isSpot ? 'bg-blue-500 hover:bg-blue-600' : 'bg-orange-500 hover:bg-orange-600'} text-white`}
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white"
                 >
                   <Text className="block">{adding ? '提取中...' : '提取并收录'}</Text>
                 </Button>

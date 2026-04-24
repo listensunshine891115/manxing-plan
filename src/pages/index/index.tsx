@@ -8,12 +8,13 @@ import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { 
   Sparkles, MapPin, Calendar, Check, User, Settings, Link2,
-  X, ChevronRight, Trash2, Plus
+  X, ChevronRight, Trash2, Plus, Heart
 } from 'lucide-react-taro'
 import { Network } from '@/network'
+import { primaryTagConfig, secondaryTagConfig } from './config'
 import './index.css'
 
-// 灵感点类型
+// 灵感点类型 - 预览用
 interface InspirationPoint {
   id?: string
   name: string
@@ -26,51 +27,6 @@ interface InspirationPoint {
   tags: string[]
   sourceUrl: string
   selected: boolean
-}
-
-// 两级标签配置
-const primaryTagConfig: Record<string, { label: string; icon: string; color: string; bgColor: string }> = {
-  '景点': { label: '景点', icon: '🏛️', color: '#3b82f6', bgColor: '#dbeafe' },
-  '美食': { label: '美食', icon: '🍜', color: '#f97316', bgColor: '#ffedd5' },
-  '购物': { label: '购物', icon: '🛍️', color: '#ec4899', bgColor: '#fce7f3' },
-  '活动': { label: '活动', icon: '🎭', color: '#8b5cf6', bgColor: '#ede9fe' },
-}
-
-// 二级标签配置
-const secondaryTagConfig: Record<string, string> = {
-  // 景点类
-  '景区': '景点',
-  '博物馆': '景点',
-  '公园': '景点',
-  '广场': '景点',
-  '古迹': '景点',
-  '地标': '景点',
-  '网红打卡': '景点',
-  '网红打卡点': '景点',
-  '打卡点': '景点',
-  // 美食类
-  '正餐': '美食',
-  '小吃': '美食',
-  '饮品': '美食',
-  '咖啡': '美食',
-  '甜点': '美食',
-  '甜点店': '美食',
-  '烧烤': '美食',
-  '火锅': '美食',
-  '日料': '美食',
-  '面馆': '美食',
-  // 购物类
-  '商场': '购物',
-  '市集': '购物',
-  '潮牌': '购物',
-  '文创': '购物',
-  // 活动类
-  '展览': '活动',
-  '展览展馆': '活动',
-  '演出': '活动',
-  '音乐': '活动',
-  '戏剧': '活动',
-  '体育': '活动',
 }
 
 // 二级标签配置
@@ -508,19 +464,28 @@ export default function Index() {
         </View>
       )}
 
-      {/* 底部开始规划按钮 */}
+      {/* 底部操作栏 */}
       {inspirations.length > 0 && (
-        <View className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-4 pb-8">
-          <Button 
-            className="w-full bg-blue-500"
-            onClick={() => {
-              const allIds = inspirations.map(i => i.id)
-              Taro.navigateTo({ url: '/pages/generate/index?selected=' + allIds.join(',') })
-            }}
-          >
-            <Text className="text-white">开始规划路线</Text>
-            <ChevronRight size={16} color="#fff" className="ml-1" />
-          </Button>
+        <View className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-3 pb-8">
+          <View className="flex gap-3">
+            {/* 查看收藏 */}
+            <Button 
+              className="flex-1 bg-white border border-gray-200"
+              onClick={() => Taro.navigateTo({ url: '/pages/favorites/index' })}
+            >
+              <Heart size={16} color="#ef4444" />
+              <Text className="text-gray-700 ml-1">收藏</Text>
+            </Button>
+            
+            {/* 选择灵感 */}
+            <Button 
+              className="flex-1 bg-blue-500"
+              onClick={() => Taro.navigateTo({ url: '/pages/select/index' })}
+            >
+              <Check size={16} color="#fff" />
+              <Text className="text-white ml-1">选择灵感</Text>
+            </Button>
+          </View>
         </View>
       )}
 

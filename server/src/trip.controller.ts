@@ -83,6 +83,22 @@ export class TripController {
     return { code: 200, msg: 'success' }
   }
 
+  // 收藏/取消收藏灵感
+  @Post('inspirations/:id/favorite')
+  async toggleFavorite(@Param('id') id: string, @Body() body: { isFavorite: boolean }) {
+    console.log(`[POST] /api/trip/inspirations/${id}/favorite - isFavorite: ${body.isFavorite}`)
+    await this.tripService.toggleFavorite(id, body.isFavorite)
+    return { code: 200, msg: 'success' }
+  }
+
+  // 获取收藏列表
+  @Get('inspirations/favorites')
+  async getFavorites(@Query('userId') userId: string) {
+    console.log(`[GET] /api/trip/inspirations/favorites - userId: ${userId}`)
+    const data = await this.tripService.getFavorites(userId)
+    return { code: 200, msg: 'success', data }
+  }
+
   // ==================== 行程管理 ====================
 
   // 获取行程列表
