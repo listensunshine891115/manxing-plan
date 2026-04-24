@@ -513,17 +513,17 @@ export default function Index() {
       )}
 
       {/* 我的漫行计划 */}
-      {trips.length > 0 && (
-        <View className="px-4 py-4 mb-20">
-          <View className="flex items-center justify-between mb-3">
-            <View className="flex items-center">
-              <Footprints size={16} color="#3b82f6" />
-              <Text className="block text-base font-semibold text-gray-900 ml-2">我的漫行计划</Text>
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {trips.length} 个
-              </Badge>
-            </View>
+      <View className="px-4 py-4 mb-20">
+        <View className="flex items-center justify-between mb-3">
+          <View className="flex items-center">
+            <Footprints size={16} color="#3b82f6" />
+            <Text className="block text-base font-semibold text-gray-900 ml-2">我的漫行计划</Text>
+            <Badge variant="secondary" className="ml-2 text-xs">
+              {trips.length} 个
+            </Badge>
           </View>
+        </View>
+        {trips.length > 0 ? (
           <View className="space-y-3">
             {trips.slice(0, 3).map((trip) => (
               <View 
@@ -556,8 +556,14 @@ export default function Index() {
               </View>
             ))}
           </View>
-        </View>
-      )}
+        ) : (
+          <View className="bg-gray-50 rounded-xl p-6 text-center">
+            <Text className="block text-sm text-gray-400">
+              暂无行程计划{'\n'}选择灵感点即可生成行程
+            </Text>
+          </View>
+        )}
+      </View>
 
       {/* 底部操作栏 */}
       {inspirations.length > 0 && (
