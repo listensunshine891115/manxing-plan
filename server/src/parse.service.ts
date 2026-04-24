@@ -28,6 +28,9 @@ export class ParseService {
   private fetchClient: FetchClient
   private llmClient: LLMClient
 
+  // GPU 服务器地址（AutoDL）
+  private gpuServerUrl = process.env.GPU_SERVER_URL
+
   constructor() {
     const config = new Config()
     
@@ -51,18 +54,40 @@ export class ParseService {
 
       // 判断输入类型
       if (input.url && input.url.includes('http')) {
-        // 链接输入：先 fetch 获取内容
         url = input.url
-        const fetchResult = await this.fetchUrl(url)
-        
-        if (!fetchResult.success) {
-          return { success: false, message: fetchResult.message || '获取页面失败' }
-        }
-
-        content = fetchResult.content || ''
-        title = fetchResult.title || '未命名'
-        coverImage = fetchResult.coverImage || ''
         sourceType = this.detectSourceType(url)
+
+        // 判断是否为短视频平台
+        if (sourceType === 'video') {
+          // 短视频平台：优先用 GPU 服务提取字幕
+          const subtitleResult = await this.extractVideoSubtitle(url)
+          
+          if (subtitleResult) {
+            // 获取到字幕，使用字幕内容
+            content = subtitleResult
+            title = '' // 可以从字幕进一步提取
+          } else {
+            // 降级：用 fetch 获取页面内容
+            const fetchResult = await this.fetchUrl(url)
+            if (!fetchResult.success) {
+              return { success: false, message: fetchResult.message || '获取页面失败' }
+            }
+            content = fetchResult.content || ''
+            title = fetchResult.title || '未命名'
+          }
+        } else {
+          // 其他平台：用 fetch 获取内容
+          const fetchResult = await this.fetchUrl(url)
+          
+          if (!fetchResult.success) {
+            return { success: false, message: fetchResult.message || '获取页面失败' }
+          }
+
+          content = fetchResult.content || ''
+          title = fetchResult.title || '未命名'
+        }
+        
+        coverImage = '' // 可以从 fetch 或 GPU 服务获取
       } else if (input.text) {
         // 直接拷贝文字
         content = input.text
@@ -106,6 +131,42 @@ export class ParseService {
     } catch (error: any) {
       console.error(`[Parse] 解析失败:`, error)
       return { success: false, message: `解析失败: ${error.message}` }
+    }
+  }
+
+  // 从 GPU 服务器提取视频字幕
+  private async extractVideoSubtitle(url: string): Promise<string | null> {
+    if (!this.gpuServerUrl) {
+      console.log(`[Parse] GPU 服务器未配置，跳过字幕提取`)
+      return null
+    }
+
+    try {
+      console.log(`[Parse] 调用 GPU 服务提取字幕: ${url}`)
+
+      const response = await fetch(`${this.gpuServerUrl}/extract`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, use_cache: true })
+      })
+
+      if (!response.ok) {
+        console.error(`[Parse] GPU 服务返回错误: ${response.status}`)
+        return null
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.subtitles) {
+        console.log(`[Parse] 字幕提取成功，长度: ${data.subtitles.length}`)
+        return data.subtitles
+      }
+
+      console.log(`[Parse] 字幕提取失败: ${data.error}`)
+      return null
+    } catch (error: any) {
+      console.error(`[Parse] 调用 GPU 服务失败:`, error)
+      return null
     }
   }
 
@@ -161,17 +222,23 @@ export class ParseService {
     
     // 一类：社交短视频平台
     if (
-      lowerUrl.includes('xiaohongshu') ||
-      lowerUrl.includes('xhs') ||
-      lowerUrl.includes('douyin') ||
-      lowerUrl.includes('kuaishou')
+      lowerUrl.includes('douyin.com') ||
+      lowerUrl.includes('v.douyin') ||
+      lowerUrl.includes('xiaohongshu.com') ||
+      lowerUrl.includes('xhslink.com') ||
+      lowerUrl.includes('bilibili.com') ||
+      lowerUrl.includes('b23.tv') ||
+      lowerUrl.includes('kuaishou.com') ||
+      lowerUrl.includes('ksurl.cn') ||
+      lowerUrl.includes('weishi.qq.com') ||
+      lowerUrl.includes('weibo.com')
     ) {
       return 'video'
     }
     
     // 二类：票务平台
     if (
-      lowerUrl.includes('damai') ||
+      lowerUrl.includes('damai.cn') ||
       lowerUrl.includes('摩天轮') ||
       lowerUrl.includes('票牛') ||
       lowerUrl.includes('大麦')
@@ -181,9 +248,9 @@ export class ParseService {
     
     // 三类：商户信息平台
     if (
-      lowerUrl.includes('dianping') ||
+      lowerUrl.includes('dianping.com') ||
       lowerUrl.includes('大众点评') ||
-      lowerUrl.includes('meituan') ||
+      lowerUrl.includes('meituan.com') ||
       lowerUrl.includes('美团')
     ) {
       return 'merchant'
