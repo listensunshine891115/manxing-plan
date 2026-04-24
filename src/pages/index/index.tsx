@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog } from '@/components/ui/dialog'
 import { Card } from '@/components/ui/card'
-import { Sparkles, MapPin, Calendar, Target, ChevronRight, MessageCircle, Copy, Check } from 'lucide-react-taro'
+import { Sparkles, MapPin, Calendar, Target, ChevronRight, MessageCircle, Copy, Check, User, X } from 'lucide-react-taro'
 import { Inspiration } from '@/types'
 import { Network } from '@/network'
 import './index.css'
@@ -18,7 +18,7 @@ const typeConfig = {
   hotel: { color: '#10B981', label: '住宿', icon: '🏨' }
 }
 
-const sourceConfig = {
+const sourceConfig: Record<string, { color: string; label: string }> = {
   xiaohongshu: { color: '#FF2442', label: '小红书' },
   dazhong: { color: '#FF6600', label: '大众点评' },
   damai: { color: '#00B51D', label: '大麦' },
@@ -39,9 +39,6 @@ export default function Index() {
     wx_openid: string
   } | null>(null)
   
-  // 登录弹窗
-  const [showLoginDialog, setShowLoginDialog] = useState(false)
-  
   // 绑定引导弹窗
   const [showBindGuide, setShowBindGuide] = useState(false)
   
@@ -54,7 +51,7 @@ export default function Index() {
       const res = await Taro.getStorage({ key: 'userInfo' })
       if (res.data) {
         setUserInfo(res.data)
-        // 检查是否首次进入（未显示过绑定引导）
+        // 检查是否首次进入
         const bindGuideShown = await Taro.getStorage({ key: 'bindGuideShown' })
         if (!bindGuideShown.data && !res.data.wx_openid) {
           setShowBindGuide(true)
@@ -70,8 +67,6 @@ export default function Index() {
   // 加载灵感列表
   const fetchInspirations = async () => {
     const user = await checkLogin()
-    
-    // 如果没有用户ID，生成临时ID（模拟）
     const userId = user?.id || 'guest_' + Date.now()
 
     try {
@@ -99,11 +94,10 @@ export default function Index() {
     try {
       const loginRes = await Taro.login()
       if (!loginRes.code) {
-        Taro.showToast({ title: '登录失败，请重试', icon: 'none' })
+        Taro.showToast({ title: '登录失败', icon: 'none' })
         return
       }
 
-      // 模拟生成用户信息
       const user = {
         id: 'user_' + Date.now(),
         openid: loginRes.code,
@@ -114,9 +108,6 @@ export default function Index() {
 
       await Taro.setStorage({ key: 'userInfo', data: user })
       setUserInfo(user)
-      setShowLoginDialog(false)
-      
-      // 显示绑定引导
       setShowBindGuide(true)
       
       Taro.showToast({ title: '登录成功', icon: 'success' })
@@ -138,7 +129,7 @@ export default function Index() {
       data: userInfo.user_code,
       success: () => {
         setCodeCopied(true)
-        Taro.showToast({ title: '已复制用户码', icon: 'success' })
+        Taro.showToast({ title: '已复制', icon: 'success' })
         setTimeout(() => setCodeCopied(false), 2000)
       }
     })
@@ -150,16 +141,14 @@ export default function Index() {
     await Taro.setStorage({ key: 'bindGuideShown', data: true })
   }
 
-  // 切换选中状态
+  // 切换选中
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => 
-      prev.includes(id)
-        ? prev.filter(i => i !== id)
-        : [...prev, id]
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     )
   }
 
-  // 全选/取消全选
+  // 全选/取消
   const toggleAll = (type: 'spot' | 'food' | 'show' | 'hotel') => {
     const typeIds = inspirations.filter(i => i.type === type).map(i => i.id)
     const allSelected = typeIds.every(id => selectedIds.includes(id))
@@ -187,54 +176,39 @@ export default function Index() {
     hotel: inspirations.filter(i => i.type === 'hotel')
   }
 
-  // 未登录状态
+  // 未登录状态 - 居中登录
   if (!userInfo) {
     return (
-      <View className="min-h-screen bg-background flex items-center justify-center">
-        <View className="text-center px-8">
-          <View className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <MapPin size={32} color="#fff" />
-          </View>
-          <Text className="block text-xl font-semibold text-foreground mb-2">此刻与你漫行</Text>
-          <Text className="block text-sm text-muted-foreground mb-8">登录后获取您的专属用户码</Text>
-          <Button className="bg-blue-500 px-8" onClick={() => setShowLoginDialog(true)}>
-            <Text className="text-white">微信一键登录</Text>
-          </Button>
+      <View className="min-h-screen bg-background flex flex-col items-center justify-center px-8">
+        <View className="w-20 h-20 bg-blue-500 rounded-2xl flex items-center justify-center mb-6">
+          <MapPin size={40} color="#fff" />
         </View>
-
-        {/* 登录弹窗 */}
-        <Dialog open={showLoginDialog} onOpenChange={(open) => setShowLoginDialog(open)}>
-          <View className="p-6">
-            <Text className="block text-lg font-medium text-center mb-4">微信登录</Text>
-            <Text className="block text-sm text-gray-500 text-center mb-6">
-              登录后将获取您的专属用户码，用于绑定公众号
-            </Text>
-            <Button className="w-full bg-blue-500" onClick={handleLogin}>
-              <Text className="text-white">确认登录</Text>
-            </Button>
-          </View>
-        </Dialog>
+        <Text className="block text-2xl font-bold text-foreground mb-2">此刻与你漫行</Text>
+        <Text className="block text-sm text-muted-foreground mb-8 text-center">
+          登录后获取专属用户码{'\n'}绑定公众号发送链接自动收录灵感
+        </Text>
+        <Button className="bg-blue-500 w-full max-w-xs" onClick={handleLogin}>
+          <User size={18} color="#fff" />
+          <Text className="text-white ml-2">微信一键登录</Text>
+        </Button>
       </View>
     )
   }
 
+  // 已登录状态
   return (
     <View className="min-h-screen bg-background pb-24">
-      {/* 顶部用户信息栏 */}
+      {/* 顶部状态栏 */}
       <View className="bg-white border-b border-gray-100 px-4 py-3">
         <View className="flex items-center justify-between">
-          {/* 左侧：品牌 + 用户码 */}
-          <View className="flex items-center gap-3">
-            <Sparkles size={20} color="#3b82f6" />
-            <View className="flex items-center gap-2">
-              <Text className="text-sm font-medium text-gray-900">{userInfo.nickname}</Text>
-              <Badge variant="outline" className="text-xs font-mono">
-                {userInfo.user_code}
-              </Badge>
-            </View>
+          <View className="flex items-center gap-2">
+            <Sparkles size={18} color="#3b82f6" />
+            <Text className="text-sm font-medium text-gray-900">{userInfo.nickname}</Text>
+            <Badge variant="outline" className="text-xs font-mono">
+              {userInfo.user_code}
+            </Badge>
           </View>
           
-          {/* 右侧：绑定状态 */}
           <View 
             className="flex items-center gap-1 px-3 py-1 rounded-full text-xs"
             style={{ 
@@ -245,12 +219,12 @@ export default function Index() {
           >
             {userInfo.wx_openid ? (
               <>
-                <Check size={12} color="#22c55e" />
+                <Check size={12} color="#16a34a" />
                 <Text>已绑定</Text>
               </>
             ) : (
               <>
-                <MessageCircle size={12} color="#f59e0b" />
+                <MessageCircle size={12} color="#d97706" />
                 <Text>未绑定</Text>
               </>
             )}
@@ -270,7 +244,7 @@ export default function Index() {
             </View>
             <View>
               <Text className="block text-sm font-medium text-gray-900">出行设置</Text>
-              <Text className="block text-xs text-gray-400">设置行程信息</Text>
+              <Text className="block text-xs text-gray-400">设置行程</Text>
             </View>
           </View>
           <View className="flex-1 bg-white rounded-xl p-4 flex items-center gap-3">
@@ -279,30 +253,23 @@ export default function Index() {
             </View>
             <View>
               <Text className="block text-sm font-medium text-gray-900">灵感管理</Text>
-              <Text className="block text-xs text-gray-400">编辑收藏夹</Text>
+              <Text className="block text-xs text-gray-400">编辑收藏</Text>
             </View>
           </View>
         </View>
       </View>
 
-      {/* 提示卡片 */}
+      {/* 提示 */}
       <View className="px-4 mb-4">
         <View className="bg-green-50 rounded-xl px-4 py-3 flex items-start gap-3">
           <MessageCircle size={16} color="#10b981" className="shrink-0 mt-1" />
-          <View className="flex-1">
-            <Text className="block text-sm text-green-800">
-              发送分享链接给「旅行助手」公众号即可自动收录
-            </Text>
-            {userInfo.wx_openid && (
-              <Text className="block text-xs text-green-600 mt-1">
-                已绑定公众号，发送链接试试吧
-              </Text>
-            )}
-          </View>
+          <Text className="block text-sm text-green-800">
+            发送分享链接给公众号即可自动收录
+          </Text>
         </View>
       </View>
 
-      {/* 灵感分类列表 */}
+      {/* 灵感列表 */}
       {(['spot', 'food', 'show', 'hotel'] as const).map(type => {
         const items = groupedInspirations[type]
         if (items.length === 0) return null
@@ -312,22 +279,20 @@ export default function Index() {
         
         return (
           <View key={type} className="mb-4">
-            {/* 类型标题 */}
             <View className="px-4 flex items-center justify-between mb-2">
               <View className="flex items-center">
                 <Text className="block mr-2">{typeInfo.icon}</Text>
                 <Text className="block text-base font-medium text-foreground">{typeInfo.label}</Text>
                 <Badge variant="secondary" className="ml-2 text-xs">{items.length}</Badge>
               </View>
-              <View 
-                className="flex items-center text-sm text-blue-500"
+              <Text 
+                className="text-sm text-blue-500"
                 onClick={() => toggleAll(type)}
               >
-                <Text>{allSelected ? '取消全选' : '全选'}</Text>
-              </View>
+                {allSelected ? '取消' : '全选'}
+              </Text>
             </View>
 
-            {/* 灵感卡片列表 */}
             <View className="px-4 space-y-3">
               {items.map(item => (
                 <Card key={item.id} className="overflow-hidden">
@@ -348,11 +313,11 @@ export default function Index() {
                           variant="secondary" 
                           className="text-xs"
                           style={{ 
-                            backgroundColor: sourceConfig[item.source as keyof typeof sourceConfig]?.color + '20',
-                            color: sourceConfig[item.source as keyof typeof sourceConfig]?.color || '#64748B'
+                            backgroundColor: sourceConfig[item.source]?.color + '20',
+                            color: sourceConfig[item.source]?.color || '#64748B'
                           }}
                         >
-                          {sourceConfig[item.source as keyof typeof sourceConfig]?.label || '其他'}
+                          {sourceConfig[item.source]?.label || '其他'}
                         </Badge>
                         <Text className="block text-xs text-gray-400">
                           {typeof item.createTime === 'string' 
@@ -380,12 +345,12 @@ export default function Index() {
           </View>
           <Text className="block text-base font-medium text-gray-900 mb-2">暂无灵感</Text>
           <Text className="block text-sm text-gray-400 text-center px-8">
-            关注公众号并发送分享链接{'\n'}即可自动收录到灵感库
+            关注公众号并发送分享链接即可收录
           </Text>
         </View>
       )}
 
-      {/* 底部规划按钮 */}
+      {/* 底部按钮 */}
       <View className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-4 py-4 pb-8">
         <View className="flex items-center gap-3">
           <View className="flex-1">
@@ -393,10 +358,7 @@ export default function Index() {
               已选 <Text className="text-blue-500 font-medium">{selectedIds.length}</Text> 项
             </Text>
           </View>
-          <Button 
-            className="bg-blue-500 px-6"
-            onClick={handleStartPlan}
-          >
+          <Button className="bg-blue-500 px-6" onClick={handleStartPlan}>
             <Text className="text-white">开始规划</Text>
             <ChevronRight size={16} color="#fff" className="ml-1" />
           </Button>
@@ -406,30 +368,31 @@ export default function Index() {
       {/* 绑定引导弹窗 */}
       <Dialog open={showBindGuide} onOpenChange={(open) => !open && handleCloseBindGuide()}>
         <View className="p-6">
-          <View className="text-center mb-6">
-            <View className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <MessageCircle size={28} color="#3b82f6" />
+          {/* 关闭按钮 */}
+          <View className="flex justify-end mb-2">
+            <View onClick={handleCloseBindGuide}>
+              <X size={20} color="#9ca3af" />
             </View>
-            <Text className="block text-lg font-medium text-gray-900 mb-2">
-              绑定公众号（推荐）
-            </Text>
-            <Text className="block text-sm text-gray-500">
-              绑定后发送旅行链接给公众号{'\n'}即可自动收录到灵感库
+          </View>
+          
+          <View className="text-center mb-4">
+            <View className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <MessageCircle size={24} color="#3b82f6" />
+            </View>
+            <Text className="block text-lg font-medium text-gray-900">绑定公众号</Text>
+            <Text className="block text-sm text-gray-500 mt-1">
+              绑定后发送链接自动收录到灵感库
             </Text>
           </View>
 
           {/* 用户码 */}
           <View className="bg-gray-50 rounded-xl p-4 mb-4">
-            <Text className="block text-xs text-gray-500 mb-2 text-center">您的专属用户码</Text>
+            <Text className="block text-xs text-gray-500 mb-2 text-center">您的用户码</Text>
             <View className="flex items-center justify-center gap-3">
               <Text className="block text-2xl font-mono font-bold text-blue-600 tracking-widest">
                 {userInfo.user_code}
               </Text>
-              <Button 
-                size="sm"
-                className="bg-white border border-gray-200"
-                onClick={handleCopyCode}
-              >
+              <Button size="sm" className="bg-white border border-gray-200" onClick={handleCopyCode}>
                 {codeCopied ? (
                   <>
                     <Check size={12} color="#22c55e" />
@@ -445,30 +408,24 @@ export default function Index() {
             </View>
           </View>
 
-          {/* 绑定步骤 */}
-          <View className="space-y-3 mb-6">
+          {/* 步骤 */}
+          <View className="space-y-2 mb-4">
             <View className="flex items-start gap-3">
-              <View className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
-                <Text className="text-white text-xs font-bold">1</Text>
+              <View className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
+                <Text className="text-white text-xs">1</Text>
               </View>
-              <Text className="block text-sm text-gray-700">打开微信，搜索「旅行助手」公众号并关注</Text>
+              <Text className="block text-sm text-gray-700">搜索关注「旅行助手」公众号</Text>
             </View>
             <View className="flex items-start gap-3">
-              <View className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
-                <Text className="text-white text-xs font-bold">2</Text>
+              <View className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
+                <Text className="text-white text-xs">2</Text>
               </View>
-              <Text className="block text-sm text-gray-700">在公众号对话框发送「绑定#{userInfo.user_code}」</Text>
-            </View>
-            <View className="flex items-start gap-3">
-              <View className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
-                <Text className="text-white text-xs font-bold">3</Text>
-              </View>
-              <Text className="block text-sm text-gray-700">绑定成功后，发送链接即可自动收录</Text>
+              <Text className="block text-sm text-gray-700">发送「绑定#{userInfo.user_code}」</Text>
             </View>
           </View>
 
           <Button className="w-full bg-blue-500" onClick={handleCloseBindGuide}>
-            <Text className="text-white">我知道了</Text>
+            <Text className="text-white">知道了</Text>
           </Button>
         </View>
       </Dialog>
