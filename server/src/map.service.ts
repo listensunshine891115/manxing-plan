@@ -202,39 +202,123 @@ export class MapService {
       return validPoints.map(p => ({ ...p, distance: 0 }))
     }
 
-    // 使用最近邻算法优化路线
-    const optimizedRoute = this.nearestNeighborRoute(validPoints)
+    // 使用最近邻算法优化路线（使用实际道路距离）
+    const optimizedRoute = await this.nearestNeighborRoute(validPoints)
 
-    // 计算相邻点之间的距离
-    const routeWithDistance = optimizedRoute.map((point, index) => {
+    // 计算相邻点之间的距离（使用实际道路距离）
+    const routeWithDistance = []
+    for (let index = 0; index < optimizedRoute.length; index++) {
+      const point = optimizedRoute[index]
       const nextPoint = optimizedRoute[index + 1]
       if (nextPoint) {
-        const distance = this.calculateDistance(point, nextPoint)
-        return { ...point, distance }
+        const distance = await this.getDrivingDistance(
+          { lat: point.lat, lng: point.lng },
+          { lat: nextPoint.lat, lng: nextPoint.lng }
+        )
+        routeWithDistance.push({ ...point, distance })
+      } else {
+        routeWithDistance.push(point)
       }
-      return point
-    })
+    }
 
-    console.log(`[MapService] 路线优化完成`)
+    console.log(`[MapService] 路线优化完成，使用道路距离计算`)
     return routeWithDistance
   }
 
   /**
-   * 最近邻算法：贪心策略优化路线
+   * 获取两点之间的实际道路距离（使用高德地图路径规划 API）
+   * @param origin 起点 { lat, lng }
+   * @param destination 终点 { lat, lng }
+   * @returns 距离（米），如果失败返回 -1
    */
-  private nearestNeighborRoute(points: Array<{
+  async getDrivingDistance(
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number }
+  ): Promise<number> {
+    if (!AMAP_KEY) {
+      // 没有 API Key，使用直线距离估算（实际道路距离通常是直线距离的 1.3-1.5 倍）
+      const straightDistance = this.calculateDistance(origin, destination)
+      return Math.round(straightDistance * 1.4) // 估算系数
+    }
+
+    try {
+      // 使用高德地图路径规划 API
+      const params = new URLSearchParams({
+        key: AMAP_KEY,
+        origins: `${origin.lng},${origin.lat}`,
+        destinations: `${destination.lng},${destination.lat}`,
+        type: '1' // 驾车距离
+      })
+
+      const response = await fetch(`${AMAP_BASE_URL}/distance?${params}`)
+      const data = await response.json()
+
+      if (data.status === '1' && data.results && data.results.length > 0) {
+        const distance = data.results[0].distance
+        console.log(`[MapService] 道路距离: ${origin} -> ${destination} = ${distance}米`)
+        return parseInt(distance) || -1
+      }
+
+      console.log(`[MapService] 路径规划无结果，使用直线距离`)
+      return this.calculateDistance(origin, destination)
+    } catch (error) {
+      console.error(`[MapService] 路径规划失败:`, error)
+      return this.calculateDistance(origin, destination)
+    }
+  }
+
+  /**
+   * 获取两点之间的步行距离（使用高德地图路径规划 API）
+   */
+  async getWalkingDistance(
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number }
+  ): Promise<number> {
+    if (!AMAP_KEY) {
+      const straightDistance = this.calculateDistance(origin, destination)
+      return Math.round(straightDistance * 1.2) // 步行系数较小
+    }
+
+    try {
+      const params = new URLSearchParams({
+        key: AMAP_KEY,
+        origins: `${origin.lng},${origin.lat}`,
+        destinations: `${destination.lng},${destination.lat}`,
+        type: '0' // 步行距离
+      })
+
+      const response = await fetch(`${AMAP_BASE_URL}/distance?${params}`)
+      const data = await response.json()
+
+      if (data.status === '1' && data.results && data.results.length > 0) {
+        const distance = data.results[0].distance
+        return parseInt(distance) || -1
+      }
+
+      return this.calculateDistance(origin, destination)
+    } catch (error) {
+      console.error(`[MapService] 步行路径规划失败:`, error)
+      return this.calculateDistance(origin, destination)
+    }
+  }
+
+  /**
+   * 最近邻算法：贪心策略优化路线
+   * 使用实际道路距离进行排序
+   */
+  async nearestNeighborRoute(points: Array<{
     id: string
     title: string
     lat: number
     lng: number
     location: string
-  }>): Array<{
+  }>): Promise<Array<{
     id: string
     title: string
     lat: number
     lng: number
     location: string
-  }> {
+  }>> {
     if (points.length === 0) return []
 
     const route: typeof points = []
@@ -244,24 +328,53 @@ export class MapService {
     let current = remaining.shift()!
     route.push(current)
 
+    // 缓存距离计算结果，避免重复请求
+    const distanceCache = new Map<string, number>()
+
+    const getDistance = async (p1: typeof points[0], p2: typeof points[0]): Promise<number> => {
+      const key = `${p1.id}-${p2.id}`
+      const reverseKey = `${p2.id}-${p1.id}`
+      
+      if (distanceCache.has(key)) return distanceCache.get(key)!
+      if (distanceCache.has(reverseKey)) return distanceCache.get(reverseKey)!
+      
+      const distance = await this.getDrivingDistance(
+        { lat: p1.lat, lng: p1.lng },
+        { lat: p2.lat, lng: p2.lng }
+      )
+      distanceCache.set(key, distance)
+      return distance
+    }
+
     while (remaining.length > 0) {
       // 找到距离当前点最近的点
       let nearestIndex = 0
       let nearestDistance = Infinity
 
-      for (let i = 0; i < remaining.length; i++) {
-        const distance = this.calculateDistance(current, remaining[i])
+      // 并行计算所有候选距离
+      const distancePromises = remaining.map(async (point, index) => {
+        const distance = await getDistance(current, point)
+        return { index, distance }
+      })
+
+      const distances = await Promise.all(distancePromises)
+
+      // 找到最小距离
+      for (const { index, distance } of distances) {
         if (distance < nearestDistance) {
           nearestDistance = distance
-          nearestIndex = i
+          nearestIndex = index
         }
       }
 
       // 移除并添加到路线
       current = remaining.splice(nearestIndex, 1)[0]
       route.push(current)
+      
+      console.log(`[MapService] 路线优化: 选择 "${current.title}", 距离上一站 ${nearestDistance}米`)
     }
 
+    console.log(`[MapService] 路线优化完成，总站点: ${route.length}`)
     return route
   }
 
