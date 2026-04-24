@@ -290,6 +290,24 @@ export class ParseService {
           } else {
             content = fetchResult.content || ''
             title = fetchResult.title || ''
+            
+            // 检测是否为无效页面（如需要登录、引流提示等）
+            const isInvalidPage = 
+              content.length < 50 || // 内容太短
+              title.includes('登录') || title.includes('error') || // 登录页或错误页
+              content.includes('App') || content.includes('打开') || // 引流提示
+              !content.match(/[\u4e00-\u9fa5]{4,}/) // 没有足够的中文内容
+            
+            // 如果是无效页面，且有输入文字，降级使用输入文字
+            if (isInvalidPage && input.text) {
+              const textContent = this.extractTextFromInput(input.text)
+              if (textContent && textContent.length > 0) {
+                console.log(`[Parse] 检测到无效页面（内容${content.length}字符），降级使用输入文字（${textContent.length}字符）`)
+                content = textContent
+                title = ''
+                sourceType = 'text'
+              }
+            }
           }
         }
       } else if (input.text) {
@@ -529,7 +547,7 @@ export class ParseService {
   private async resolveShortUrl(shortUrl: string): Promise<string | null> {
     try {
       // 如果不是短链，直接返回原 URL
-      if (!/xhslink\.com|b23\.tv|v\.douyin\.com/i.test(shortUrl)) {
+      if (!/xhslink\.com|b23\.tv|v\.douyin\.com|dpurl\.cn/i.test(shortUrl)) {
         return shortUrl
       }
 
@@ -619,6 +637,17 @@ export class ParseService {
       // 票务平台使用 Playwright 获取
       if (isTicketPlatform) {
         return await this.fetchTicketPlatform(realUrl)
+      }
+      
+      // 判断是否为大众点评/美团
+      const isDianPing = 
+        lowerUrl.includes('dianping.com') ||
+        lowerUrl.includes('dpurl.cn') ||
+        lowerUrl.includes('meituan.com')
+      
+      // 大众点评使用 Playwright 获取
+      if (isDianPing) {
+        return await this.fetchDianPing(realUrl)
       }
       
       // 其他网站使用 fetchClient
@@ -903,6 +932,145 @@ export class ParseService {
     }
   }
 
+  // 专门获取大众点评内容（使用 Playwright 渲染）
+  private async fetchDianPing(url: string): Promise<{
+    success: boolean
+    content?: string
+    title?: string
+    coverImage?: string
+    imageUrls?: string[]
+    message?: string
+  }> {
+    let browser: playwright.Browser | null = null
+    try {
+      console.log(`[Parse] 大众点评内容，使用 Playwright 渲染获取: ${url}`)
+      
+      // 解析短链接
+      let realUrl = url
+      if (url.includes('dpurl.cn')) {
+        try {
+          const resolved = await this.resolveShortUrl(url)
+          if (resolved) {
+            realUrl = resolved
+            console.log(`[Parse] 短链接解析: ${url} -> ${realUrl}`)
+          }
+        } catch (e) {
+          console.log(`[Parse] 短链接解析失败，使用原链接`)
+        }
+      }
+      
+      // 使用 Playwright 启动无头浏览器
+      browser = await playwright.chromium.launch({ 
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      })
+      const page = await browser.newPage()
+      
+      // 设置视口和用户代理（移动端）
+      await page.setViewportSize({ width: 375, height: 812 })
+      await page.setExtraHTTPHeaders({
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
+      })
+      
+      // 访问页面并等待内容加载
+      await page.goto(realUrl, { waitUntil: 'networkidle', timeout: 20000 })
+      
+      // 等待页面主要元素加载
+      await page.waitForTimeout(2000)
+      
+      // 获取标题（店铺名称）
+      const title = await page.title()
+      console.log(`[Parse] 大众点评标题: ${title}`)
+      
+      // 获取页面主要内容
+      const content = await page.evaluate(() => {
+        // 尝试多种选择器获取店铺信息
+        const selectors = [
+          // 店铺信息区域
+          '[class*="shop-info"]', '[class*="shopInfo"]',
+          '[class*="shop-detail"]', '[class*="shopDetail"]',
+          // 评价区域
+          '[class*="comment"]', '[class*="review"]',
+          // 主内容区
+          'main', '.main-content', '#content',
+          // 商品信息
+          '[class*="product"]', '[class*="deal"]',
+          // 移动端特定
+          '[class*="shop-base"]', '[class*="shopBase"]',
+        ]
+        
+        let mainContent = ''
+        for (const selector of selectors) {
+          const el = document.querySelector(selector) as HTMLElement | null
+          if (el) {
+            const text = el.innerText || el.textContent || ''
+            if (text.length > mainContent.length) {
+              mainContent = text
+            }
+          }
+        }
+        
+        // 如果没找到，尝试获取 body
+        if (!mainContent || mainContent.length < 50) {
+          mainContent = document.body.innerText || document.body.textContent || ''
+        }
+        
+        // 清理文本
+        mainContent = mainContent.replace(/\s+/g, ' ').trim()
+        
+        // 限制长度
+        if (mainContent.length > 5000) {
+          mainContent = mainContent.slice(0, 5000)
+        }
+        
+        return mainContent
+      })
+      
+      console.log(`[Parse] 大众点评内容长度: ${content.length}`)
+      
+      // 获取页面中的图片
+      const imageUrls = await page.evaluate(() => {
+        const images = document.querySelectorAll('img')
+        const urls: string[] = []
+        
+        images.forEach((img) => {
+          let src = img.getAttribute('data-src') || img.getAttribute('src') || ''
+          // 过滤掉 logo、icon、小图
+          if (src && !src.includes('logo') && !src.includes('icon') && 
+              !src.includes('placeholder') && src.length > 50) {
+            urls.push(src)
+          }
+        })
+        
+        return urls.slice(0, 10)
+      })
+      
+      console.log(`[Parse] 大众点评图片数量: ${imageUrls.length}`)
+      
+      // 获取封面图
+      const coverImage = imageUrls.length > 0 ? imageUrls[0] : ''
+      
+      if (!content) {
+        return { success: false, message: '无法提取店铺信息' }
+      }
+      
+      return {
+        success: true,
+        content,
+        title,
+        coverImage,
+        imageUrls
+      }
+    } catch (error: any) {
+      console.error(`[Parse] 大众点评 Playwright 获取失败:`, error.message)
+      return { success: false, message: `获取店铺信息失败: ${error.message}` }
+    } finally {
+      if (browser) {
+        await browser.close().catch(() => {})
+      }
+    }
+  }
+
   // 检测来源类型
   private detectSourceType(url: string): SourceType {
     const lowerUrl = url.toLowerCase()
@@ -945,9 +1113,10 @@ export class ParseService {
       return 'ticket'
     }
     
-    // 三类：商户信息平台
+    // 三类：商户信息平台（大众点评、美团）
     if (
       lowerUrl.includes('dianping.com') ||
+      lowerUrl.includes('dpurl.cn') ||
       lowerUrl.includes('大众点评') ||
       lowerUrl.includes('meituan.com') ||
       lowerUrl.includes('美团')
