@@ -293,7 +293,7 @@ export default function Index() {
       <View className="min-h-screen bg-background flex flex-col items-center justify-center px-8">
         {/* Logo 和名称 */}
         <View className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-6 shadow-lg">
-          <Text className="text-white text-3xl font-bold">漫</Text>
+          <Sparkles size={48} color="#FFFFFF" />
         </View>
         <Text className="block text-2xl font-bold text-foreground mb-1">此刻与你漫行</Text>
         <Text className="block text-sm text-muted-foreground mb-8 text-center">
@@ -353,7 +353,7 @@ export default function Index() {
         {/* Logo 和名称 */}
         <View className="flex items-center mb-4">
           <View className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
-            <Text className="text-white text-xl font-bold">漫</Text>
+            <Sparkles size={28} color="#FFFFFF" />
           </View>
           <View className="ml-3">
             <Text className="block text-xl font-bold text-gray-900">此刻与你漫行</Text>
