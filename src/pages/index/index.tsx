@@ -4,7 +4,6 @@ import { View, Text } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { 
   Sparkles, MapPin, Calendar, Check, User, Settings, Link2,
@@ -38,8 +37,7 @@ export default function Index() {
   // 用户状态
   const [userInfo, setUserInfo] = useState<any>(null)
 
-  // 粘贴链接弹窗
-  const [showPasteDialog, setShowPasteDialog] = useState(false)
+  // 粘贴链接
   const [linkInput, setLinkInput] = useState('')
   const [pasting, setPasting] = useState(false)
 
@@ -148,7 +146,6 @@ export default function Index() {
           selected: p.selected !== false
         }))
         setPreviewPoints(pointsWithSelected)
-        setShowPasteDialog(false)
         setShowPreviewDialog(true)
         setLinkInput('')
       } else {
@@ -377,10 +374,13 @@ export default function Index() {
 
         {/* 粘贴灵感输入区 */}
         <View className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 mb-4 border border-green-100">
-          <View className="flex items-center mb-3">
+          <View className="flex items-center mb-2">
             <Link2 size={16} color="#10b981" />
             <Text className="block text-sm font-medium text-green-700 ml-2">粘贴灵感</Text>
           </View>
+          <Text className="block text-xs text-green-600 mb-3">
+            种草短视频、票务平台、公众号文章链接，或者直接输入灵感信息
+          </Text>
           <View className="flex gap-2">
             <View className="flex-1 bg-white rounded-lg px-3 py-2">
               <Input 
@@ -488,46 +488,6 @@ export default function Index() {
           </View>
         </View>
       )}
-
-      {/* 粘贴灵感弹窗 */}
-      <Dialog open={showPasteDialog} onOpenChange={(open) => !open && setShowPasteDialog(false)}>
-        <View className="p-6">
-          <View className="text-center mb-4">
-            <View className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Link2 size={24} color="#10b981" />
-            </View>
-            <Text className="block text-lg font-medium text-gray-900">粘贴灵感</Text>
-            <Text className="block text-sm text-gray-500 mt-1">
-              粘贴你的：种草短视频、票务平台、公众号文章&quot;链接&quot;，一键形成灵感库
-            </Text>
-          </View>
-          <View className="bg-gray-50 rounded-xl p-4 mb-4">
-            <View className="mb-3">
-              <Input 
-                className="w-full bg-white"
-                placeholder="粘贴链接..."
-                value={linkInput}
-                onInput={(e: any) => setLinkInput(e.target.value)}
-              />
-            </View>
-            <View className="flex gap-2">
-              <Button 
-                className="flex-1 bg-white border border-gray-200"
-                onClick={handlePasteFromClipboard}
-              >
-                <Text className="text-blue-600">粘贴</Text>
-              </Button>
-              <Button 
-                className="flex-1 bg-blue-500"
-                onClick={handlePasteLink}
-                disabled={pasting}
-              >
-                <Text className="text-white">{pasting ? '收录中...' : '收录'}</Text>
-              </Button>
-            </View>
-          </View>
-        </View>
-      </Dialog>
 
       {/* 预览灵感点弹窗 */}
       {showPreviewDialog && (
@@ -694,11 +654,12 @@ export default function Index() {
                     className="bg-green-500"
                     onClick={() => {
                       setShowCategoryDialog(false)
-                      setShowPasteDialog(true)
+                      // 滚动到顶部粘贴灵感
+                      Taro.pageScrollTo({ scrollTop: 0, duration: 300 })
                     }}
                   >
                     <Plus size={14} color="#fff" />
-                    <Text className="text-white ml-1">收录灵感</Text>
+                    <Text className="text-white ml-1">去收录</Text>
                   </Button>
                 </View>
               ) : (
