@@ -529,12 +529,6 @@ export class ParseService {
         if (match) {
           return match[0].split('?')[0] // 去掉查询参数
         }
-        
-        // 尝试从 links 中查找
-        const linkItem = response.content.find(item => item.type === 'link')
-        if (linkItem?.link) {
-          return linkItem.link
-        }
       }
       
       return null
