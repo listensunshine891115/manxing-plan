@@ -449,7 +449,8 @@ export default function Index() {
         {/* 我的灵感点 */}
         <View className="flex items-center justify-between">
           <View className="flex items-center">
-            <Text className="block text-base font-semibold text-gray-900">我的灵感点</Text>
+            <Sparkles size={16} color="#8b5cf6" />
+            <Text className="block text-base font-semibold text-gray-900 ml-2">我的灵感点</Text>
             <Badge variant="secondary" className="ml-2 text-xs">
               {inspirations.length} 个
             </Badge>
