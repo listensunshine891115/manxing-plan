@@ -92,9 +92,7 @@ export default function Index() {
   // 加载行程列表
   const fetchTrips = async () => {
     const user = await checkLogin()
-    const userId = user?.id
-
-    if (!userId) return
+    const userId = user?.id || Taro.getStorageSync('userInfo')?.id
 
     try {
       const res = await Network.request({
@@ -104,6 +102,7 @@ export default function Index() {
       console.log('[GET] /api/trip/trips - Response:', res.data)
       if (res.data?.data) {
         setTrips(res.data.data)
+        console.log('[首页] 获取到行程:', res.data.data.length, '个')
       }
     } catch (error) {
       console.error('获取行程失败:', error)

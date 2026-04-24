@@ -90,6 +90,10 @@ export default function Confirm() {
 
     setConfirming(true)
     try {
+      // 获取用户信息
+      const userInfo = Taro.getStorageSync('userInfo')
+      const userId = userInfo?.id
+
       // 调用后端 API 保存行程
       const res = await Network.request({
         url: '/api/trip/trips',
@@ -105,7 +109,8 @@ export default function Confirm() {
             days: routePlan.settings.days,
             startDate: routePlan.settings.startDate,
             mainDestination: routePlan.settings.mainDestination
-          }
+          },
+          userId
         }
       })
 
