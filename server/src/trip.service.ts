@@ -186,6 +186,17 @@ export class TripService {
     return data
   }
 
+  // 获取单个行程
+  async getTrip(id: string) {
+    const { data, error } = await this.client
+      .from('trips')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (error) throw new Error(`获取行程失败: ${error.message}`)
+    return data
+  }
+
   // 生成多个路线版本
   async generateTripVersions(
     userId: string,
@@ -318,7 +329,7 @@ export class TripService {
     const { data: trips, error: listError } = await this.client
       .from('trips')
       .select('id')
-      .eq('user_id', (await this.getTripById(tripId))?.user_id)
+      .eq('user_id', (await this.getTrip(tripId))?.user_id)
     if (listError) throw new Error(`查询行程失败: ${listError.message}`)
 
     for (const trip of trips || []) {
