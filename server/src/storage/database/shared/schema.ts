@@ -10,7 +10,7 @@ export const users = pgTable(
     unionid: varchar("unionid", { length: 64 }), // 微信 unionid
     nickname: varchar("nickname", { length: 50 }), // 昵称
     avatar: varchar("avatar", { length: 500 }), // 头像
-    user_code: varchar("user_code", { length: 10 }).unique(), // 用户码，用于消息关联
+    user_code: varchar("user_code", { length: 10 }).unique(), // 用户码（可选，用于非微信场景）
     create_time: timestamp("create_time", { withTimezone: true }).defaultNow().notNull(),
     update_time: timestamp("update_time", { withTimezone: true }),
   },

@@ -3,10 +3,9 @@ import { getSupabaseClient } from '@/storage/database/supabase-client'
 
 interface User {
   id: string
-  openid?: string
+  openid: string  // 微信 openid，用于关联公众号消息
   nickname?: string
   avatar?: string
-  user_code: string  // 用户码，用于消息关联
   create_time: string
 }
 
@@ -22,90 +21,78 @@ export class UserService {
   }
 
   // 创建或获取用户（通过 openid）
-  async getOrCreateUser(openid: string, nickname?: string, avatar?: string) {
-    // 先查询是否存在
+  async getOrCreateUser(openid: string, nickname?: string, avatar?: string): Promise<User> {
+    // 查找已有用户
     const { data: existing } = await this.client
       .from('users')
       .select('*')
       .eq('openid', openid)
-      .maybeSingle()
+      .single()
 
     if (existing) {
       // 更新昵称和头像
       if (nickname || avatar) {
-        await this.client
+        const { data: updated } = await this.client
           .from('users')
           .update({ nickname, avatar })
-          .eq('id', existing.id)
+          .eq('openid', openid)
+          .select()
+          .single()
+        return updated
       }
       return existing
     }
 
-    // 创建新用户，生成用户码
-    const userCode = this.generateUserCode()
-    const { data, error } = await this.client
+    // 创建新用户
+    const { data: newUser, error } = await this.client
       .from('users')
       .insert({
         openid,
-        nickname,
-        avatar,
-        user_code: userCode
+        nickname: nickname || '旅行者',
+        avatar: avatar || ''
       })
       .select()
       .single()
 
-    if (error) throw new Error(`创建用户失败: ${error.message}`)
-    return data
-  }
+    if (error) {
+      console.error('创建用户失败:', error)
+      throw new Error('创建用户失败')
+    }
 
-  // 通过用户码获取用户
-  async getUserByCode(userCode: string) {
-    const { data, error } = await this.client
-      .from('users')
-      .select('*')
-      .eq('user_code', userCode)
-      .maybeSingle()
-
-    if (error) throw new Error(`查询用户失败: ${error.message}`)
-    return data
+    return newUser
   }
 
   // 通过 openid 获取用户
-  async getUserByOpenid(openid: string) {
-    const { data, error } = await this.client
+  async getUserByOpenid(openid: string): Promise<User | null> {
+    const { data } = await this.client
       .from('users')
       .select('*')
       .eq('openid', openid)
-      .maybeSingle()
-
-    if (error) throw new Error(`查询用户失败: ${error.message}`)
-    return data
+      .single()
+    return data || null
   }
 
-  // 生成唯一用户码（6位字母数字）
-  private generateUserCode(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    let code = ''
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length))
+  // 更新用户信息
+  async updateUser(openid: string, updates: Partial<User>): Promise<User> {
+    const { data, error } = await this.client
+      .from('users')
+      .update(updates)
+      .eq('openid', openid)
+      .select()
+      .single()
+
+    if (error) {
+      throw new Error('更新用户失败')
     }
-    return code
-  }
-
-  // 验证用户码是否存在
-  async validateUserCode(code: string): Promise<boolean> {
-    const user = await this.getUserByCode(code)
-    return !!user
+    return data
   }
 
   // 获取用户灵感数量
   async getUserInspirationCount(userId: string): Promise<number> {
-    const { count, error } = await this.client
+    const { count } = await this.client
       .from('inspirations')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
-
-    if (error) return 0
     return count || 0
   }
 }
