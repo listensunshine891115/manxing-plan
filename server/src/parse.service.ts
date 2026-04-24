@@ -114,27 +114,36 @@ export class ParseService {
             } else {
               // 降级2：用 fetch 获取页面内容（可能失败）
               const fetchResult = await this.fetchUrl(url)
-              if (!fetchResult.success) {
-                // 降级3：直接返回原始文字内容
-                return {
-                  success: true,
-                  data: {
-                    name: this.extractTextFromInput(input.url || input.text || ''),
-                    source: '社交短视频平台',
-                    type: '视频',
-                    location_name: '',
-                    time: '',
-                    price: '',
-                    description: input.url || input.text || '',
-                    tags: [],
-                    original_url: url,
-                  },
-                  message: '已收录，但未能获取详细信息'
+              if (fetchResult.success) {
+                content = fetchResult.content || ''
+                title = fetchResult.title || '未命名'
+                coverImage = fetchResult.coverImage || ''
+              } else {
+                // 降级3：从输入文字中提取内容
+                const textContent = this.extractTextFromInput(input.url || input.text || '')
+                if (textContent) {
+                  console.log(`[Parse] 视频获取失败，降级使用输入文字: ${textContent.substring(0, 50)}...`)
+                  content = textContent
+                  title = ''
+                } else {
+                  // 降级4：直接返回原始文字内容
+                  return {
+                    success: true,
+                    data: {
+                      name: this.extractTextFromInput(input.url || input.text || ''),
+                      source: '社交短视频平台',
+                      type: '视频',
+                      location_name: '',
+                      time: '',
+                      price: '',
+                      description: input.url || input.text || '',
+                      tags: [],
+                      original_url: url,
+                    },
+                    message: '已收录，但未能获取详细信息'
+                  }
                 }
               }
-              content = fetchResult.content || ''
-              title = fetchResult.title || '未命名'
-              coverImage = fetchResult.coverImage || ''
             }
           }
         } else if (sourceType === 'article') {
@@ -152,35 +161,43 @@ export class ParseService {
             title = fetchResult.title || ''
             coverImage = fetchResult.coverImage || ''
           } else {
-            // 降级：尝试视频提取
+            // 降级1：尝试视频提取（可能是视频链接被误判为图文）
             console.log(`[Parse] 图文获取失败，尝试视频提取...`)
             const subtitleResult = await this.extractVideoSubtitle(url)
             if (subtitleResult) {
               content = subtitleResult
               title = ''
             } else {
-              // 降级1：尝试 yt-dlp
+              // 降级2：尝试 yt-dlp
               const ytDlpResult = await this.getVideoInfoWithYtDlp(url)
               if (ytDlpResult.success) {
                 content = ytDlpResult.description || ytDlpResult.title || ''
                 title = ytDlpResult.title || ''
                 coverImage = ytDlpResult.thumbnail || ''
               } else {
-                // 降级2：直接返回原始文字内容
-                return {
-                  success: true,
-                  data: {
-                    name: this.extractTextFromInput(input.url || input.text || ''),
-                    source: '社交平台',
-                    type: '图文',
-                    location_name: '',
-                    time: '',
-                    price: '',
-                    description: input.url || input.text || '',
-                    tags: [],
-                    original_url: url,
-                  },
-                  message: '已收录，但未能获取详细信息'
+                // 降级3：从输入文字中提取内容
+                const textContent = this.extractTextFromInput(input.url || input.text || '')
+                if (textContent) {
+                  console.log(`[Parse] 图文全部失败，降级使用输入文字: ${textContent.substring(0, 50)}...`)
+                  content = textContent
+                  title = ''
+                } else {
+                  // 降级4：直接返回原始文字内容
+                  return {
+                    success: true,
+                    data: {
+                      name: this.extractTextFromInput(input.url || input.text || ''),
+                      source: '社交平台',
+                      type: '图文',
+                      location_name: '',
+                      time: '',
+                      price: '',
+                      description: input.url || input.text || '',
+                      tags: [],
+                      original_url: url,
+                    },
+                    message: '已收录，但未能获取详细信息'
+                  }
                 }
               }
             }
