@@ -1,12 +1,12 @@
 export default defineAppConfig({
   pages: [
-    'pages/preview/index',
-    'pages/login/index',
     'pages/index/index',
+    'pages/login/index',
     'pages/generate/index',
     'pages/route/index',
     'pages/vote/index',
-    'pages/vote-result/index'
+    'pages/vote-result/index',
+    'pages/preview/index'
   ],
   window: {
     backgroundTextStyle: 'light',

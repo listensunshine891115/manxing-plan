@@ -13,7 +13,7 @@ export interface Inspiration {
   time?: string
   price?: number
   rating?: number
-  createTime: number
+  createTime?: string | number
 }
 
 // 行程天数数据
