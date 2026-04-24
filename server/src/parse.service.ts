@@ -220,15 +220,24 @@ export class ParseService {
       let sourceUrl = input.url || ''
       let sourceType: SourceType = 'article'
 
-      // 提取 URL
+      // 提取 URL 和保留文本部分
+      let originalText = ''
       if (input.url) {
         const extractedUrl = this.extractUrl(input.url || '')
         if (extractedUrl) {
           sourceUrl = extractedUrl
           sourceType = this.detectSourceType(sourceUrl)
+          // 保留 URL 前后的文本部分，用于降级
+          originalText = input.url.replace(extractedUrl, '').trim()
+          console.log(`[Parse] 提取到 URL: ${sourceUrl}, 原文文本: ${originalText}`)
         } else {
           sourceUrl = ''
         }
+      }
+      
+      // 如果有纯文本输入，也保留
+      if (input.text) {
+        originalText = originalText ? `${originalText} ${input.text}` : input.text
       }
 
       // 根据来源类型获取内容
@@ -298,11 +307,11 @@ export class ParseService {
               content.includes('App') || content.includes('打开') || // 引流提示
               !content.match(/[\u4e00-\u9fa5]{4,}/) // 没有足够的中文内容
             
-            // 如果是无效页面，且有输入文字，降级使用输入文字
-            if (isInvalidPage && input.text) {
-              const textContent = this.extractTextFromInput(input.text)
+            // 如果是无效页面，且有原始文本，降级使用
+            if (isInvalidPage && originalText) {
+              const textContent = this.extractTextFromInput(originalText)
               if (textContent && textContent.length > 0) {
-                console.log(`[Parse] 检测到无效页面（内容${content.length}字符），降级使用输入文字（${textContent.length}字符）`)
+                console.log(`[Parse] 检测到无效页面（内容${content.length}字符），降级使用原始文本（${textContent.length}字符）`)
                 content = textContent
                 title = ''
                 sourceType = 'text'
@@ -310,8 +319,13 @@ export class ParseService {
             }
           }
         }
-      } else if (input.text) {
+      } else if (originalText) {
         // 直接输入文字
+        content = this.extractTextFromInput(originalText)
+        title = ''
+        sourceType = 'text'
+      } else if (input.text) {
+        // 直接输入文字（fallback）
         content = this.extractTextFromInput(input.text)
         title = ''
         sourceType = 'text'
