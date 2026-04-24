@@ -510,6 +510,40 @@ export class ParseService {
     }
   }
 
+  // 解析短链接为真实 URL
+  private async resolveShortUrl(shortUrl: string): Promise<string | null> {
+    try {
+      // 使用 FetchClient 访问短链接，它会自动跟随重定向
+      const response = await this.fetchClient.fetch(shortUrl)
+      
+      // 如果成功返回内容，检查是否有重定向后的 URL
+      if (response.status_code === 0 && response.content) {
+        // 从返回的内容中提取真实 URL
+        const textContent = response.content
+          .filter(item => item.type === 'text')
+          .map(item => item.text)
+          .join('\n')
+        
+        // 如果文本中包含 xiaohongshu.com 的 URL，说明已经解析成功
+        const match = textContent.match(/https?:\/\/(?:www\.)?xiaohongshu\.com[^\s<>"\]]+/)
+        if (match) {
+          return match[0].split('?')[0] // 去掉查询参数
+        }
+        
+        // 尝试从 links 中查找
+        const linkItem = response.content.find(item => item.type === 'link')
+        if (linkItem?.link) {
+          return linkItem.link
+        }
+      }
+      
+      return null
+    } catch (error: any) {
+      console.error(`[Parse] 短链接解析失败: ${error.message}`)
+      return null
+    }
+  }
+
   // 使用 fetch-url 获取页面内容
   private async fetchUrl(url: string): Promise<{
     success: boolean
@@ -521,7 +555,21 @@ export class ParseService {
     try {
       console.log(`[Parse] Fetch URL: ${url}`)
       
-      const response = await this.fetchClient.fetch(url)
+      // 先解析短链接（如果需要）
+      let realUrl = url
+      if (url.includes('xhslink.com')) {
+        try {
+          const resolved = await this.resolveShortUrl(url)
+          if (resolved) {
+            realUrl = resolved
+            console.log(`[Parse] 短链接解析: ${url} -> ${realUrl}`)
+          }
+        } catch (e) {
+          console.log(`[Parse] 短链接解析失败，使用原链接`)
+        }
+      }
+      
+      const response = await this.fetchClient.fetch(realUrl)
 
       if (response.status_code !== 0) {
         return {
