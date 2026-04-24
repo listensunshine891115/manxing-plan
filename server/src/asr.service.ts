@@ -44,9 +44,11 @@ export class AsrService {
     console.log(`[ASR] 开始语音识别: ${audioPath}`)
 
     // 1. 优先尝试百度 ASR
-    if (BAIDU_ASR_CONFIG.apiKey && BAIDU_ASR_CONFIG.appId) {
+    const baiduApiKey = process.env.BAIDU_ASR_API_KEY
+    const baiduAppId = process.env.BAIDU_ASR_APP_ID
+    if (baiduApiKey && baiduAppId) {
       try {
-        const result = await this.baiduASR(audioPath)
+        const result = await this.baiduASR(audioPath, baiduAppId, baiduApiKey)
         if (result) {
           console.log(`[ASR] 百度 ASR 成功`)
           return result
@@ -57,9 +59,12 @@ export class AsrService {
     }
 
     // 2. 降级尝试讯飞 ASR
-    if (XUNFEI_ASR_CONFIG.appId && XUNFEI_ASR_CONFIG.apiKey) {
+    const xunfeiAppId = process.env.XUNFEI_ASR_APP_ID
+    const xunfeiApiKey = process.env.XUNFEI_ASR_API_KEY
+    const xunfeiApiSecret = process.env.XUNFEI_ASR_API_SECRET
+    if (xunfeiAppId && xunfeiApiKey) {
       try {
-        const result = await this.xunfeiASR(audioPath)
+        const result = await this.xunfeiASR(audioPath, xunfeiAppId, xunfeiApiKey, xunfeiApiSecret || '')
         if (result) {
           console.log(`[ASR] 讯飞 ASR 成功`)
           return result
@@ -77,8 +82,11 @@ export class AsrService {
    * 百度 ASR
    * 文档: https://cloud.baidu.com/doc/SPEECH/s/AsynRec API
    */
-  private async baiduASR(audioPath: string): Promise<string | null> {
-    const { appId, apiKey, secretKey, format, rate, devPid } = BAIDU_ASR_CONFIG
+  private async baiduASR(audioPath: string, appId: string, apiKey: string): Promise<string | null> {
+    const secretKey = process.env.BAIDU_ASR_SECRET_KEY || ''
+    const format = 'pcm'
+    const rate = 16000
+    const devPid = 1737
 
     // 1. 获取 access token
     const token = await this.getBaiduAccessToken(apiKey, secretKey)
@@ -143,8 +151,9 @@ export class AsrService {
    * 讯飞 ASR
    * 文档: https://www.xfyun.cn/doc/asr/voicetranscription/API.html
    */
-  private async xunfeiASR(audioPath: string): Promise<string | null> {
-    const { appId, apiKey, apiSecret, format, rate } = XUNFEI_ASR_CONFIG
+  private async xunfeiASR(audioPath: string, appId: string, apiKey: string, apiSecret: string): Promise<string | null> {
+    const format = 'wav'
+    const rate = 16000
 
     // 读取音频文件
     const audioBuffer = fs.readFileSync(audioPath)
@@ -244,7 +253,7 @@ export class AsrService {
    * 检查 ASR 服务是否可用
    */
   isAvailable(): boolean {
-    return !!(BAIDU_ASR_CONFIG.apiKey || XUNFEI_ASR_CONFIG.appId)
+    return !!(process.env.BAIDU_ASR_API_KEY || process.env.XUNFEI_ASR_APP_ID)
   }
 
   /**
@@ -252,8 +261,8 @@ export class AsrService {
    */
   getConfigStatus(): { baidu: boolean; xunfei: boolean } {
     return {
-      baidu: !!(BAIDU_ASR_CONFIG.apiKey && BAIDU_ASR_CONFIG.appId),
-      xunfei: !!(XUNFEI_ASR_CONFIG.appId && XUNFEI_ASR_CONFIG.apiKey),
+      baidu: !!(process.env.BAIDU_ASR_API_KEY && process.env.BAIDU_ASR_APP_ID),
+      xunfei: !!(process.env.XUNFEI_ASR_APP_ID && process.env.XUNFEI_ASR_API_KEY),
     }
   }
 }

@@ -1,7 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '@/app.module';
 import * as express from 'express';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 import { HttpStatusInterceptor } from '@/interceptors/http-status.interceptor';
+
+// 加载 .env 文件（相对于项目根目录）
+const envPath = path.resolve(__dirname, '..', '.env');
+dotenv.config({ path: envPath });
+console.log('[Main] Loading env from:', envPath);
 
 function parsePort(): number {
   const args = process.argv.slice(2);
