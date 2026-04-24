@@ -89,21 +89,16 @@ export default function Index() {
     fetchInspirations()
   }, [])
 
-  // 微信登录
+  // 微信登录（临时开放，无需真实微信登录）
   const handleLogin = async () => {
     try {
-      const loginRes = await Taro.login()
-      if (!loginRes.code) {
-        Taro.showToast({ title: '登录失败', icon: 'none' })
-        return
-      }
-
+      // 直接生成用户信息（临时开放权限）
       const user = {
         id: 'user_' + Date.now(),
-        openid: loginRes.code,
+        openid: 'wx_test_' + Date.now(),
         nickname: '旅行者',
         user_code: generateUserCode(),
-        wx_openid: ''
+        wx_openid: ''  // 未绑定公众号
       }
 
       await Taro.setStorage({ key: 'userInfo', data: user })
