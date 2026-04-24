@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Network } from '@/network'
 import { InspirationCard, InspirationItem } from '@/components/inspiration-card'
-import { ArrowLeft, Sparkles, SlidersHorizontal, MapPin, RotateCcw } from 'lucide-react-taro'
+import { ArrowLeft, Sparkles, SlidersHorizontal, MapPin, RotateCcw, X } from 'lucide-react-taro'
+import { chinaProvinces, getCitiesByProvince } from '@/config/china-cities'
 import { primaryTagConfig } from '../index/config'
 import './index.config'
 
@@ -22,6 +23,7 @@ interface CategoryStat {
 
 // 城市统计
 interface CityStat {
+  province: string
   city: string
   count: number
 }
@@ -31,7 +33,8 @@ const SelectPage = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   
-  // 筛选状态
+  // 筛选状态 - 省市两级
+  const [selectedProvince, setSelectedProvince] = useState<string>('')
   const [selectedCity, setSelectedCity] = useState<string>('')
   const [selectedCategory, setSelectedCategory] = useState<string>('全部')
 
@@ -67,30 +70,91 @@ const SelectPage = () => {
     }
   }
 
-  // 从灵感点中提取城市列表
-  const cityStats: CityStat[] = useMemo(() => {
-    const cityMap = new Map<string, number>()
+  // 从灵感点中提取省市列表（按省-市两级）
+  const provinceCityStats: CityStat[] = useMemo(() => {
+    const statsMap = new Map<string, CityStat>()
+    
     allInspirations.forEach(inspiration => {
-      // 从 location_name 中提取城市（通常是第一个逗号前的部分）
       const location = inspiration.location_name || ''
-      // 简单处理：如果包含逗号，取第一部分作为城市
-      const city = location.includes(',') ? location.split(',')[0].trim() : location.trim()
-      if (city) {
-        cityMap.set(city, (cityMap.get(city) || 0) + 1)
+      if (!location) return
+      
+      // 尝试匹配省和城市
+      let matchedProvince = ''
+      let matchedCity = ''
+      
+      // 先匹配城市（更精确）
+      for (const province of chinaProvinces) {
+        for (const city of province.cities) {
+          const cityName = city.name.replace('市', '')
+          if (location.includes(cityName) || location.includes(city.name)) {
+            matchedProvince = province.name
+            matchedCity = city.name
+            break
+          }
+        }
+        if (matchedCity) break
+      }
+      
+      // 如果没匹配到城市，尝试匹配省份
+      if (!matchedProvince) {
+        for (const province of chinaProvinces) {
+          const provinceName = province.name.replace(/省|市|自治区|特别行政区/g, '')
+          if (location.includes(provinceName) || location.includes(province.name)) {
+            matchedProvince = province.name
+            break
+          }
+        }
+      }
+      
+      if (matchedProvince || matchedCity) {
+        const key = matchedCity || matchedProvince
+        if (!statsMap.has(key)) {
+          statsMap.set(key, { 
+            province: matchedProvince, 
+            city: matchedCity, 
+            count: 0 
+          })
+        }
+        statsMap.get(key)!.count++
       }
     })
-    return Array.from(cityMap.entries())
-      .map(([city, count]) => ({ city, count }))
+    
+    return Array.from(statsMap.values())
       .sort((a, b) => b.count - a.count)
   }, [allInspirations])
 
+  // 获取有数据的省份列表
+  const provincesWithData = useMemo(() => {
+    const provinces = new Set<string>()
+    provinceCityStats.forEach(stat => {
+      if (stat.province) provinces.add(stat.province)
+    })
+    return Array.from(provinces).sort()
+  }, [provinceCityStats])
+
+  // 根据选择的省份获取城市列表
+  const citiesInProvince = useMemo(() => {
+    if (!selectedProvince) return []
+    return provinceCityStats
+      .filter(stat => stat.province === selectedProvince && stat.city)
+      .map(stat => ({ city: stat.city, count: stat.count }))
+      .sort((a, b) => b.count - a.count)
+  }, [selectedProvince, provinceCityStats])
+
   // 判断是否有筛选条件
-  const hasFilters = selectedCity !== '' || selectedCategory !== '全部'
+  const hasFilters = selectedProvince !== '' || selectedCity !== '' || selectedCategory !== '全部'
 
   // 重置筛选条件
   const resetFilters = () => {
+    setSelectedProvince('')
     setSelectedCity('')
     setSelectedCategory('全部')
+  }
+
+  // 处理省份变化
+  const handleProvinceChange = (province: string) => {
+    setSelectedProvince(province)
+    setSelectedCity('') // 切换省份时清空城市
   }
 
   // 处理收藏/取消收藏
@@ -172,15 +236,25 @@ const SelectPage = () => {
     Taro.navigateTo({ url: `/pages/generate/index?selected=${selected}` })
   }
 
-  // 根据城市+分类筛选
+  // 根据省+市+分类筛选
   const filteredInspirations = useMemo(() => {
     let result = allInspirations
     
-    // 城市筛选
+    // 城市/省份筛选
     if (selectedCity) {
+      // 精确匹配城市
       result = result.filter(i => {
         const location = i.location_name || ''
-        return location.startsWith(selectedCity) || location.includes(`,${selectedCity}`)
+        return location.includes(selectedCity.replace('市', '')) || location.includes(selectedCity)
+      })
+    } else if (selectedProvince) {
+      // 匹配该省份下的所有城市
+      const provinceCities = getCitiesByProvince(selectedProvince)
+      result = result.filter(i => {
+        const location = i.location_name || ''
+        return provinceCities.some(city => 
+          location.includes(city.replace('市', '')) || location.includes(city)
+        )
       })
     }
     
@@ -190,17 +264,25 @@ const SelectPage = () => {
     }
     
     return result
-  }, [allInspirations, selectedCity, selectedCategory])
+  }, [allInspirations, selectedProvince, selectedCity, selectedCategory])
 
-  // 获取分类统计（基于当前筛选后的城市）
+  // 获取分类统计（基于当前筛选后的结果）
   const getStats = () => {
     let baseData = allInspirations
     
-    // 如果选了城市，先按城市筛选
+    // 如果选了城市/省份
     if (selectedCity) {
       baseData = allInspirations.filter(i => {
         const location = i.location_name || ''
-        return location.startsWith(selectedCity) || location.includes(`,${selectedCity}`)
+        return location.includes(selectedCity.replace('市', '')) || location.includes(selectedCity)
+      })
+    } else if (selectedProvince) {
+      const provinceCities = getCitiesByProvince(selectedProvince)
+      baseData = allInspirations.filter(i => {
+        const location = i.location_name || ''
+        return provinceCities.some(city => 
+          location.includes(city.replace('市', '')) || location.includes(city)
+        )
       })
     }
     
@@ -214,6 +296,7 @@ const SelectPage = () => {
   const getFilterDescription = () => {
     const parts: string[] = []
     if (selectedCity) parts.push(selectedCity)
+    else if (selectedProvince) parts.push(selectedProvince)
     if (selectedCategory !== '全部') {
       const stat = getStats().find(s => s.tag === selectedCategory)
       if (stat) parts.push(stat.icon + stat.label)
@@ -253,52 +336,88 @@ const SelectPage = () => {
           )}
         </View>
         
-        {/* 筛选下拉行 */}
-        <View className="px-4 py-3 flex items-center gap-4">
-          {/* 城市筛选 */}
-          <View className="flex-1">
-            <Text className="block text-xs text-gray-400 mb-1">
-              <MapPin size={12} color="#9ca3af" className="inline mr-1" />
-              城市
-            </Text>
-            <Select
-              value={selectedCity}
-              onValueChange={(value) => setSelectedCity(value)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="不限城市" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">不限城市</SelectItem>
-                {cityStats.map(cs => (
-                  <SelectItem key={cs.city} value={cs.city}>
-                    {cs.city} ({cs.count})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* 省市+分类筛选行 */}
+        <View className="px-4 py-3 space-y-3">
+          {/* 省市选择 */}
+          <View className="flex items-center gap-3">
+            <View className="flex items-center flex-1">
+              <Text className="block text-xs text-gray-400 mr-2 w-8">
+                <MapPin size={12} color="#9ca3af" className="inline" />
+              </Text>
+              {/* 省份选择 */}
+              <View className="flex-1">
+                <Select
+                  value={selectedProvince}
+                  onValueChange={handleProvinceChange}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="选择省份" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">全国</SelectItem>
+                    {provincesWithData.map(province => (
+                      <SelectItem key={province} value={province}>
+                        {province}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </View>
+            </View>
+            
+            {/* 城市选择 */}
+            {selectedProvince && citiesInProvince.length > 0 && (
+              <View className="flex-1">
+                <Select
+                  value={selectedCity}
+                  onValueChange={setSelectedCity}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="选择城市" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">全部城市</SelectItem>
+                    {citiesInProvince.map(({ city, count }) => (
+                      <SelectItem key={city} value={city}>
+                        {city.replace('市', '')} ({count})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </View>
+            )}
+            
+            {/* 清除城市按钮 */}
+            {selectedCity && (
+              <View 
+                onClick={() => setSelectedCity('')}
+                className="p-1"
+              >
+                <X size={16} color="#9ca3af" />
+              </View>
+            )}
           </View>
           
-          {/* 分类筛选 */}
-          <View className="flex-1">
-            <Text className="block text-xs text-gray-400 mb-1">
-              类别
-            </Text>
-            <Select
-              value={selectedCategory}
-              onValueChange={(value) => setSelectedCategory(value)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="全部分类" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="全部">🏠 全部</SelectItem>
-                <SelectItem value="景点">🏛️ 景点</SelectItem>
-                <SelectItem value="美食">🍜 美食</SelectItem>
-                <SelectItem value="购物">🛍️ 购物</SelectItem>
-                <SelectItem value="活动">🎭 活动</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* 分类选择 */}
+          <View className="flex items-center gap-3">
+            <Text className="block text-xs text-gray-400 w-8">类别</Text>
+            <View className="flex-1">
+              <Select
+                value={selectedCategory}
+                onValueChange={setSelectedCategory}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="选择分类" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="全部">🏠 全部</SelectItem>
+                  <SelectItem value="景点">🏛️ 景点</SelectItem>
+                  <SelectItem value="美食">🍜 美食</SelectItem>
+                  <SelectItem value="购物">🛍️ 购物</SelectItem>
+                  <SelectItem value="活动">🎭 活动</SelectItem>
+                </SelectContent>
+              </Select>
+            </View>
           </View>
         </View>
         
