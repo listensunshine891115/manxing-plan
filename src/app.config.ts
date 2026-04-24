@@ -8,8 +8,8 @@ export default defineAppConfig({
   ],
   window: {
     backgroundTextStyle: 'light',
-    navigationBarBackgroundColor: '#fff',
-    navigationBarTitleText: '旅行路线生成器',
+    navigationBarBackgroundColor: '#ffffff',
+    navigationBarTitleText: '此刻与你漫行',
     navigationBarTextStyle: 'black'
   }
 })

@@ -108,24 +108,40 @@ export default function Index() {
     if (inspirations.length === 0) {
       return
     }
-    // 跳转到生成设置页
     window.location.href = '/pages/generate/index'
   }
 
   return (
     <View className="min-h-screen bg-background pb-24">
-      {/* 顶部导航 */}
-      <View className="sticky top-0 z-10 bg-background px-4 pt-4 pb-3">
-        <View className="flex items-center justify-between">
-          <Text className="block text-xl font-semibold text-foreground">我的旅行灵感</Text>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={handleOpenAdd}
-          >
-            <Plus size={24} color="#3B82F6" />
-          </Button>
+      {/* 品牌标识区 */}
+      <View className="brand-header">
+        <View className="brand-logo">
+          <View className="logo-icon">
+            <Sparkles size={24} color="#3B82F6" />
+          </View>
         </View>
+        <Text className="block text-xl font-semibold text-foreground">此刻与你漫行</Text>
+        <Text className="block text-sm text-muted-foreground mt-1">收集灵感，规划你的旅程</Text>
+      </View>
+
+      {/* 操作栏 */}
+      <View className="px-4 py-3 flex items-center justify-between">
+        <View>
+          {inspirations.length > 0 && (
+            <Text className="block text-sm text-muted-foreground">
+              已收藏 <Text style={{ color: '#3B82F6', fontWeight: 600 }}>{inspirations.length}</Text> 个灵感
+            </Text>
+          )}
+        </View>
+        <Button 
+          variant="default"
+          size="sm"
+          onClick={handleOpenAdd}
+          className="h-9 px-4"
+        >
+          <Plus size={16} color="#ffffff" className="mr-1" />
+          <Text className="block text-sm font-medium">添加灵感</Text>
+        </Button>
       </View>
 
       {/* 灵感列表 */}
@@ -145,12 +161,23 @@ export default function Index() {
             ))}
           </View>
         ) : inspirations.length === 0 ? (
-          <View className="flex flex-col items-center justify-center py-20">
-            <View className="mb-4 rounded-full bg-muted p-4">
-              <Sparkles size={48} color="#94A3B8" />
+          <View className="empty-state">
+            <View className="empty-icon">
+              <MapPin size={40} color="#94A3B8" />
             </View>
-            <Text className="block text-base text-muted-foreground mb-2">暂无灵感</Text>
-            <Text className="block text-sm text-muted-foreground">点击右上角添加旅行目的地吧</Text>
+            <Text className="block text-base font-medium text-foreground mb-2">开始你的旅行灵感收集</Text>
+            <Text className="block text-sm text-muted-foreground text-center leading-relaxed">
+              从小红书、大众点评等平台{'\n'}复制链接粘贴到这里
+            </Text>
+            <Button 
+              variant="outline"
+              size="lg"
+              onClick={handleOpenAdd}
+              className="mt-6 h-12 px-8"
+            >
+              <Plus size={18} color="#3B82F6" className="mr-2" />
+              <Text className="block text-sm font-medium" style={{ color: '#3B82F6' }}>添加第一个灵感</Text>
+            </Button>
           </View>
         ) : (
           <View className="waterfall-grid">
@@ -161,12 +188,16 @@ export default function Index() {
                   onLongPress={() => handleDelete(item.id)}
                 >
                   <View className="relative">
-                    {item.image && (
+                    {item.image ? (
                       <Image 
                         src={item.image} 
                         className="w-full h-40 object-cover"
                         mode="aspectFill"
                       />
+                    ) : (
+                      <View className="w-full h-40 bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
+                        <MapPin size={32} color="#BFDBFE" />
+                      </View>
                     )}
                     <View 
                       className="absolute top-2 right-2 px-2 py-1 rounded text-xs text-white"
@@ -191,16 +222,6 @@ export default function Index() {
                         <Text className="block truncate">{item.location.name}</Text>
                       </View>
                     )}
-                    {item.price && (
-                      <Text className="block text-xs text-orange-500 mt-1">
-                        ¥{item.price}
-                      </Text>
-                    )}
-                    {item.rating && (
-                      <Text className="block text-xs text-yellow-500 mt-1">
-                        ⭐ {item.rating / 100}
-                      </Text>
-                    )}
                   </CardContent>
                 </Card>
               </View>
@@ -218,11 +239,6 @@ export default function Index() {
         >
           生成路线
         </Button>
-        {inspirations.length > 0 && (
-          <Text className="block text-center text-xs text-muted-foreground mt-2">
-            已收藏 {inspirations.length} 个灵感
-          </Text>
-        )}
       </View>
 
       {/* 分享收集弹窗 */}
