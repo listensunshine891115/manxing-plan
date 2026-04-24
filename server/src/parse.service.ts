@@ -1040,7 +1040,7 @@ export class ParseService {
         const links = document.querySelectorAll('a[href]')
         links.forEach((link) => {
           const href = link.getAttribute('href') || ''
-          const text = link.innerText?.trim() || ''
+          const text = (link as HTMLElement).innerText?.trim() || ''
           
           // 只获取大众点评店铺相关的链接
           if (href.includes('dianping.com') && text && text.length > 1 && text.length < 50) {
