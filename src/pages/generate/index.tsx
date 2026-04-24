@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { ArrowLeft, CalendarDays, Clock, Car, Bus, MapPin, Search, X, ChevronRight, Loader, Navigation, Sparkles } from 'lucide-react-taro'
+import { Switch } from '@/components/ui/switch'
+import { ArrowLeft, CalendarDays, Clock, Car, Bus, MapPin, Search, X, ChevronRight, Loader, Users, Wand } from 'lucide-react-taro'
 import { format } from 'date-fns'
 import { Network } from '@/network'
 import Taro from '@tarojs/taro'
@@ -85,6 +86,9 @@ export default function Generate() {
   const [timePeriod, setTimePeriod] = useState('two_three')
   const [transportMode, setTransportMode] = useState<'public' | 'self-drive'>('public')
   const [showCalendar, setShowCalendar] = useState(false)
+
+  // 邀请同伴
+  const [inviteCompanion, setInviteCompanion] = useState(false)
 
   // 集合地点
   const [meetingPoint, setMeetingPoint] = useState('')
@@ -454,93 +458,108 @@ export default function Generate() {
           </RadioGroup>
         </View>
 
-        {/* 集合地点 */}
+        {/* 邀请同伴 */}
         <View className="bg-white rounded-xl p-4 shadow-sm">
-          <View className="flex items-center mb-3">
-            <View className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-              <Navigation size={16} color="#3b82f6" />
+          <View className="flex items-center justify-between">
+            <View className="flex items-center">
+              <View className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                <Users size={16} color="#8b5cf6" />
+              </View>
+              <View className="ml-2">
+                <Text className="block text-sm font-medium text-gray-900">邀请同伴协作</Text>
+                <Text className="block text-xs text-gray-500">分享路线给朋友投票选择</Text>
+              </View>
             </View>
-            <Text className="block text-sm font-medium text-gray-900 ml-2">集合地点</Text>
-            <Text className="block text-xs text-gray-400 ml-auto">可选</Text>
+            <Switch 
+              checked={inviteCompanion} 
+              onCheckedChange={(checked) => setInviteCompanion(checked)} 
+            />
           </View>
-          
-          {/* 已选择地点 */}
-          {meetingPoint ? (
-            <View className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-              <View className="flex items-center flex-1">
-                <MapPin size={16} color="#10b981" />
-                <Text className="block text-sm text-green-700 ml-2 flex-1 truncate">
-                  {meetingPoint}
-                </Text>
-              </View>
-              <View 
-                className="p-1"
-                onClick={clearMeetingPoint}
-              >
-                <X size={16} color="#10b981" />
-              </View>
-            </View>
-          ) : (
-            /* 搜索输入框 */
-            <View className="relative">
-              <View className="flex items-center bg-gray-50 rounded-lg px-3 py-2">
-                <Search size={16} color="#9ca3af" />
-                <Input
-                  className="flex-1 ml-2 text-sm bg-transparent"
-                  placeholder="输入集合地点名称"
-                  value={meetingPoint}
-                  onInput={(e: any) => setMeetingPoint(e.detail.value)}
-                  onBlur={() => {
-                    if (meetingPoint.trim()) {
-                      searchMeetingPoint(meetingPoint)
-                    }
-                  }}
-                />
-                {searching && (
-                  <Loader size={16} color="#3b82f6" className="animate-spin" />
-                )}
-              </View>
 
-              {/* 搜索结果列表 */}
-              {showSearch && searchResults.length > 0 && (
-                <View className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-100 z-50 max-h-48 overflow-y-auto">
-                  {searchResults.map((place, index) => (
-                    <View 
-                      key={index}
-                      className="px-3 py-3 border-b border-gray-50 last:border-b-0"
-                      onClick={() => selectMeetingPoint(place)}
-                    >
-                      <View className="flex items-start">
-                        <MapPin size={14} color="#64748b" className="mt-1" />
-                        <View className="ml-2 flex-1">
-                          <Text className="block text-sm text-gray-900">{place.name}</Text>
-                          {place.address && (
-                            <Text className="block text-xs text-gray-500 mt-1">{place.address}</Text>
-                          )}
+          {/* 集合地点 - 仅在邀请同伴时显示 */}
+          {inviteCompanion && (
+            <View className="mt-4 pt-4 border-t border-gray-100">
+              <Text className="block text-xs text-gray-500 mb-2">集合地点（同伴在此集合）</Text>
+              
+              {/* 已选择地点 */}
+              {meetingPoint ? (
+                <View className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                  <View className="flex items-center flex-1">
+                    <MapPin size={16} color="#10b981" />
+                    <Text className="block text-sm text-green-700 ml-2 flex-1 truncate">
+                      {meetingPoint}
+                    </Text>
+                  </View>
+                  <View 
+                    className="p-1"
+                    onClick={clearMeetingPoint}
+                  >
+                    <X size={16} color="#10b981" />
+                  </View>
+                </View>
+              ) : (
+                /* 搜索输入框 */
+                <View className="relative">
+                  <View className="flex items-center bg-gray-50 rounded-lg px-3 py-2">
+                    <Search size={16} color="#9ca3af" />
+                    <Input
+                      className="flex-1 ml-2 text-sm bg-transparent"
+                      placeholder="输入集合地点名称"
+                      value={meetingPoint}
+                      onInput={(e: any) => setMeetingPoint(e.detail.value)}
+                      onBlur={() => {
+                        if (meetingPoint.trim()) {
+                          searchMeetingPoint(meetingPoint)
+                        }
+                      }}
+                    />
+                    {searching && (
+                      <Loader size={16} color="#3b82f6" className="animate-spin" />
+                    )}
+                  </View>
+
+                  {/* 搜索结果列表 */}
+                  {showSearch && searchResults.length > 0 && (
+                    <View className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-100 z-50 max-h-48 overflow-y-auto">
+                      {searchResults.map((place, index) => (
+                        <View 
+                          key={index}
+                          className="px-3 py-3 border-b border-gray-50 last:border-b-0"
+                          onClick={() => selectMeetingPoint(place)}
+                        >
+                          <View className="flex items-start">
+                            <MapPin size={14} color="#64748b" className="mt-1" />
+                            <View className="ml-2 flex-1">
+                              <Text className="block text-sm text-gray-900">{place.name}</Text>
+                              {place.address && (
+                                <Text className="block text-xs text-gray-500 mt-1">{place.address}</Text>
+                              )}
+                            </View>
+                          </View>
                         </View>
-                      </View>
+                      ))}
                     </View>
-                  ))}
+                  )}
+
+                  {/* 点击外部关闭搜索结果 */}
+                  {showSearch && (
+                    <View 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => {
+                        setShowSearch(false)
+                        setSearchResults([])
+                      }}
+                    />
+                  )}
                 </View>
               )}
 
-              {/* 点击外部关闭搜索结果 */}
-              {showSearch && (
-                <View 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => {
-                    setShowSearch(false)
-                    setSearchResults([])
-                  }}
-                />
+              {meetingCoords && (
+                <Text className="block text-xs text-gray-400 mt-2">
+                  已定位：({meetingCoords.lat.toFixed(4)}, {meetingCoords.lng.toFixed(4)})
+                </Text>
               )}
             </View>
-          )}
-
-          {meetingCoords && (
-            <Text className="block text-xs text-gray-400 mt-2">
-              已定位：({meetingCoords.lat.toFixed(4)}, {meetingCoords.lng.toFixed(4)})
-            </Text>
           )}
         </View>
 
@@ -566,7 +585,7 @@ export default function Generate() {
             </>
           ) : (
             <>
-              <Sparkles size={18} color="#ffffff" className="mr-2" />
+              <Wand size={18} color="#ffffff" className="mr-2" />
               <Text className="text-white">生成路线</Text>
               <ChevronRight size={18} color="#ffffff" className="ml-2" />
             </>
