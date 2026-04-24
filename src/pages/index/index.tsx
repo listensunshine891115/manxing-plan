@@ -32,7 +32,44 @@ interface InspirationPoint {
 const primaryTagConfig: Record<string, { label: string; icon: string; color: string; bgColor: string }> = {
   '景点': { label: '景点', icon: '🏛️', color: '#3b82f6', bgColor: '#dbeafe' },
   '美食': { label: '美食', icon: '🍜', color: '#f97316', bgColor: '#ffedd5' },
+  '购物': { label: '购物', icon: '🛍️', color: '#ec4899', bgColor: '#fce7f3' },
+  '活动': { label: '活动', icon: '🎭', color: '#8b5cf6', bgColor: '#ede9fe' },
 }
+
+// 二级标签配置
+const secondaryTagConfig: Record<string, string> = {
+  // 景点类
+  '景区': '景点',
+  '博物馆': '景点',
+  '公园': '景点',
+  '广场': '景点',
+  '古迹': '景点',
+  '地标': '景点',
+  '网红打卡': '景点',
+  // 美食类
+  '正餐': '美食',
+  '小吃': '美食',
+  '饮品': '美食',
+  '咖啡': '美食',
+  '甜点': '美食',
+  '烧烤': '美食',
+  '火锅': '美食',
+  '日料': '美食',
+  '面馆': '美食',
+  // 购物类
+  '商场': '购物',
+  '市集': '购物',
+  '潮牌': '购物',
+  '文创': '购物',
+  // 活动类
+  '展览': '活动',
+  '演出': '活动',
+  '音乐': '活动',
+  '戏剧': '活动',
+  '体育': '活动',
+}
+
+// 二级标签配置
 
 export default function Index() {
   const [inspirations, setInspirations] = useState<any[]>([])
@@ -177,19 +214,26 @@ export default function Index() {
 
     setPreviewLoading(true)
     try {
-      const items = selectedPoints.map(point => ({
-        user_id: userInfo?.id,
-        title: point.name,
-        source: 'xiaohongshu',
-        primary_tag: point.primaryTag,
-        secondary_tag: point.secondaryTag,
-        location_name: point.location,
-        time: point.time,
-        price: point.price,
-        description: point.description,
-        original_url: point.sourceUrl,
-        tags: point.tags
-      }))
+      const items = selectedPoints.map(point => {
+        // 根据二级标签自动归类到一级分类
+        const primaryTag = point.secondaryTag 
+          ? (secondaryTagConfig[point.secondaryTag] || point.primaryTag || '景点')
+          : (point.primaryTag || '景点')
+        
+        return {
+          user_id: userInfo?.id,
+          title: point.name,
+          source: 'xiaohongshu',
+          primary_tag: primaryTag,
+          secondary_tag: point.secondaryTag || '',
+          location_name: point.location,
+          time: point.time,
+          price: point.price,
+          description: point.description,
+          original_url: point.sourceUrl,
+          tags: point.tags
+        }
+      })
 
       const res = await Network.request({
         url: '/api/trip/inspirations/batch',
@@ -273,6 +317,16 @@ export default function Index() {
       tag: '美食', 
       count: inspirations.filter(i => i.primary_tag === '美食').length,
       ...primaryTagConfig['美食']
+    },
+    { 
+      tag: '购物', 
+      count: inspirations.filter(i => i.primary_tag === '购物').length,
+      ...primaryTagConfig['购物']
+    },
+    { 
+      tag: '活动', 
+      count: inspirations.filter(i => i.primary_tag === '活动').length,
+      ...primaryTagConfig['活动']
     },
   ]
 
@@ -535,15 +589,23 @@ export default function Index() {
                         </Text>
                         
                         <View className="flex items-center gap-2 flex-wrap mb-2">
-                          <Badge 
-                            style={{ 
-                              backgroundColor: (primaryTagConfig[point.primaryTag]?.bgColor || '#f3f4f6'),
-                              color: primaryTagConfig[point.primaryTag]?.color || '#64748b'
-                            }}
-                          >
-                            {primaryTagConfig[point.primaryTag]?.icon || '📍'}{' '}
-                            {primaryTagConfig[point.primaryTag]?.label || point.primaryTag}
-                          </Badge>
+                          {/* 根据二级标签自动计算一级分类 */}
+                          {(() => {
+                            const displayPrimaryTag = point.secondaryTag 
+                              ? (secondaryTagConfig[point.secondaryTag] || point.primaryTag || '景点')
+                              : (point.primaryTag || '景点')
+                            const tagConfig = primaryTagConfig[displayPrimaryTag] || primaryTagConfig['景点']
+                            return (
+                              <Badge 
+                                style={{ 
+                                  backgroundColor: tagConfig.bgColor,
+                                  color: tagConfig.color
+                                }}
+                              >
+                                {tagConfig.icon} {tagConfig.label}
+                              </Badge>
+                            )
+                          })()}
                           {point.secondaryTag && (
                             <Badge variant="secondary">
                               {point.secondaryTag}
