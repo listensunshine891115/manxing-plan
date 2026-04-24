@@ -13,9 +13,17 @@ export class TripController {
 
   // 获取灵感列表
   @Get('inspirations')
-  async getInspirations(@Query('userId') userId?: string) {
-    const data = await this.tripService.getInspirations(userId)
-    console.log(`[GET] /api/trip/inspirations - userId: ${userId}`)
+  async getInspirations(@Query('userId') userId?: string, @Query('primaryTag') primaryTag?: string) {
+    const data = await this.tripService.getInspirations(userId, primaryTag)
+    console.log(`[GET] /api/trip/inspirations - userId: ${userId}, primaryTag: ${primaryTag}`)
+    return { code: 200, msg: 'success', data }
+  }
+
+  // 获取灵感统计
+  @Get('inspirations/count')
+  async getInspirationsCount(@Query('userId') userId?: string) {
+    const data = await this.tripService.getInspirationsCount(userId)
+    console.log(`[GET] /api/trip/inspirations/count - userId: ${userId}`)
     return { code: 200, msg: 'success', data }
   }
 

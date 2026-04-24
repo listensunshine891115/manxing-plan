@@ -1,6 +1,7 @@
 export default defineAppConfig({
   pages: [
     'pages/index/index',
+    'pages/category/index',
     'pages/bind-guide/index',
     'pages/settings/index',
     'pages/generate/index',

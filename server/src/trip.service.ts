@@ -42,14 +42,45 @@ export class TripService {
   // ==================== 灵感管理 ====================
 
   // 获取灵感列表
-  async getInspirations(userId?: string) {
+  async getInspirations(userId?: string, primaryTag?: string) {
     let query = this.client.from('inspirations').select('*')
     if (userId) {
       query = query.eq('user_id', userId)
     }
+    if (primaryTag) {
+      query = query.eq('primary_tag', primaryTag)
+    }
     const { data, error } = await query.order('create_time', { ascending: false })
     if (error) throw new Error(`获取灵感失败: ${error.message}`)
     return data
+  }
+
+  // 获取灵感统计（按一级标签分组计数）
+  async getInspirationsCount(userId?: string) {
+    const { data, error } = await this.client
+      .from('inspirations')
+      .select('primary_tag')
+      .eq('user_id', userId || '')
+    
+    if (error) {
+      console.error('[TripService] 获取灵感统计失败:', JSON.stringify(error))
+      return []
+    }
+    
+    // 按 primary_tag 分组计数
+    const countMap = new Map<string, number>()
+    for (const item of data || []) {
+      const tag = item.primary_tag || '景点'
+      countMap.set(tag, (countMap.get(tag) || 0) + 1)
+    }
+    
+    const result = Array.from(countMap.entries()).map(([primary_tag, count]) => ({
+      primary_tag,
+      count
+    }))
+    
+    console.log(`[TripService] 灵感统计:`, JSON.stringify(result))
+    return result
   }
 
   // 添加灵感
