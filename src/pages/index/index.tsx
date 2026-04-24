@@ -447,54 +447,6 @@ export default function Index() {
           </Text>
         </View>
 
-        {/* 我的漫游计划 */}
-        {trips.length > 0 && (
-          <View className="mt-4">
-            <View className="flex items-center justify-between mb-3">
-              <View className="flex items-center">
-                <Footprints size={16} color="#3b82f6" />
-                <Text className="block text-base font-semibold text-gray-900 ml-2">我的漫游计划</Text>
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  {trips.length} 个
-                </Badge>
-              </View>
-            </View>
-            <View className="space-y-3">
-              {trips.slice(0, 3).map((trip) => (
-                <View 
-                  key={trip.id}
-                  className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100"
-                  onClick={() => {
-                    // 查看行程详情
-                    Taro.setStorage({ key: 'currentTrip', data: trip })
-                    Taro.navigateTo({ url: '/pages/confirm/index' })
-                  }}
-                >
-                  <View className="flex items-center justify-between">
-                    <View className="flex items-center">
-                      <Calendar size={14} color="#3b82f6" />
-                      <Text className="block text-sm font-medium text-gray-900 ml-2">
-                        {trip.version_name || '我的行程'}
-                      </Text>
-                    </View>
-                    <View className="flex items-center text-xs text-gray-500">
-                      <Clock size={12} color="#9ca3af" />
-                      <Text className="ml-1">
-                        {trip.settings?.days || 1}天行程
-                      </Text>
-                    </View>
-                  </View>
-                  {trip.settings?.startDate && (
-                    <Text className="block text-xs text-gray-500 mt-1 ml-5">
-                      {trip.settings.startDate}
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
         {/* 我的灵感点 */}
         <View className="flex items-center justify-between">
           <View className="flex items-center">
@@ -559,6 +511,53 @@ export default function Index() {
           </Card>
         ))}
       </View>
+      )}
+
+      {/* 我的漫行计划 */}
+      {trips.length > 0 && (
+        <View className="px-4 py-4 mb-20">
+          <View className="flex items-center justify-between mb-3">
+            <View className="flex items-center">
+              <Footprints size={16} color="#3b82f6" />
+              <Text className="block text-base font-semibold text-gray-900 ml-2">我的漫行计划</Text>
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {trips.length} 个
+              </Badge>
+            </View>
+          </View>
+          <View className="space-y-3">
+            {trips.slice(0, 3).map((trip) => (
+              <View 
+                key={trip.id}
+                className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100"
+                onClick={() => {
+                  Taro.setStorage({ key: 'currentTrip', data: trip })
+                  Taro.navigateTo({ url: '/pages/confirm/index' })
+                }}
+              >
+                <View className="flex items-center justify-between">
+                  <View className="flex items-center">
+                    <Calendar size={14} color="#3b82f6" />
+                    <Text className="block text-sm font-medium text-gray-900 ml-2">
+                      {trip.version_name || '我的行程'}
+                    </Text>
+                  </View>
+                  <View className="flex items-center text-xs text-gray-500">
+                    <Clock size={12} color="#9ca3af" />
+                    <Text className="ml-1">
+                      {trip.settings?.days || 1}天行程
+                    </Text>
+                  </View>
+                </View>
+                {trip.settings?.startDate && (
+                  <Text className="block text-xs text-gray-500 mt-1 ml-5">
+                    {trip.settings.startDate}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
       )}
 
       {/* 底部操作栏 */}
