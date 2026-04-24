@@ -133,7 +133,7 @@ export class MessageController {
         hotel: '🏨'
       }[result.type] || '📍'
 
-      return this.replyText(wxOpenid, `${typeEmoji} 已收录！
+      return this.replyText(wxOpenid || '', `${typeEmoji} 已收录！
 
 ${result.title || title || '未知标题'}
 
@@ -144,7 +144,7 @@ ${result.title || title || '未知标题'}
 
     } catch (error) {
       console.error('[WeChat] 解析失败:', error)
-      return this.replyText(wxOpenid, `收录失败，请检查链接是否有效
+      return this.replyText(wxOpenid || '', `收录失败，请检查链接是否有效
 
 支持的平台：
 • 小红书

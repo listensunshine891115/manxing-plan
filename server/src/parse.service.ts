@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import { Config, FetchClient } from 'coze-coding-dev-sdk'
 import { getSupabaseClient } from '@/storage/database/supabase-client'
 
 // 类型定义
@@ -35,19 +34,17 @@ export class ParseService {
     try {
       console.log(`[Parse] 正在解析链接: ${url}`)
       
-      // 使用 FetchClient 抓取内容
-      const config = new Config()
-      const client = new FetchClient(config)
-      const response = await client.fetch(url)
+      // 使用原生 fetch 抓取内容
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
+        }
+      })
       
-      console.log(`[Parse] 抓取结果: status=${response.status_code}, title=${response.title}`)
-      
-      if (response.status_code !== 0) {
-        throw new Error(`抓取失败: ${response.status_message}`)
-      }
+      const html = await response.text()
       
       // 解析内容
-      const parsed = this.extractContent(response, url)
+      const parsed = this.extractFromHtml(html, url)
       
       // 保存到数据库
       const inspiration = await this.saveInspiration({
@@ -75,22 +72,27 @@ export class ParseService {
     }
   }
 
-  // 从响应中提取内容
-  private extractContent(response: any, url: string): ParsedContent {
-    const title = response.title || '未命名灵感'
-    
-    // 提取第一张图片
-    let image: string | undefined
-    const images = response.content?.filter((item: any) => item.type === 'image') || []
-    if (images.length > 0) {
-      image = images[0].image?.display_url || images[0].image?.image_url
+  // 从HTML中提取内容
+  private extractFromHtml(html: string, url: string): ParsedContent {
+    // 提取标题
+    let title = '未命名灵感'
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i)
+    if (titleMatch) {
+      title = titleMatch[1].trim()
     }
     
-    // 提取文本描述（取前200字）
+    // 提取描述
     let description: string | undefined
-    const texts = response.content?.filter((item: any) => item.type === 'text') || []
-    if (texts.length > 0) {
-      description = texts.map((t: any) => t.text).join('\n').slice(0, 200)
+    const descMatch = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/i)
+    if (descMatch) {
+      description = descMatch[1].slice(0, 200)
+    }
+    
+    // 提取图片（取第一张）
+    let image: string | undefined
+    const imgMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i)
+    if (imgMatch) {
+      image = imgMatch[1]
     }
     
     // 根据URL和内容自动识别类型
@@ -176,10 +178,14 @@ export class ParseService {
 
   // 批量解析（支持多条链接）
   async batchParse(urls: string[], userId: string): Promise<any[]> {
-    const results = []
+    const results: any[] = []
     for (const url of urls) {
-      const result = await this.parseShareUrl(url, userId)
-      results.push(result)
+      try {
+        const result = await this.parseShareUrl(url, userId)
+        results.push({ success: true, ...result })
+      } catch (error: any) {
+        results.push({ success: false, error: error.message })
+      }
     }
     return results
   }

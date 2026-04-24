@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { getSupabaseClient } from '@/storage/database/supabase-client'
 
-interface User {
+export interface User {
   id: string
   openid: string  // 微信 openid（小程序）
   wx_openid: string  // 微信公众号 openid（单独存储，用于绑定）
