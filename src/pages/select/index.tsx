@@ -3,9 +3,10 @@ import Taro from '@tarojs/taro'
 import { View, Text } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Network } from '@/network'
 import { InspirationCard, InspirationItem } from '@/components/inspiration-card'
-import { ArrowLeft, Sparkles } from 'lucide-react-taro'
+import { ArrowLeft, Sparkles, SlidersHorizontal } from 'lucide-react-taro'
 import { primaryTagConfig } from '../index/config'
 import './index.config'
 
@@ -16,13 +17,14 @@ interface CategoryStat {
   icon: string
   count: number
   bgColor: string
+  color: string
 }
 
 const SelectPage = () => {
   const [allInspirations, setAllInspirations] = useState<InspirationItem[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<string>('全部')
+  const [activeCategory, setActiveCategory] = useState<string>('全部')
 
   // 分类统计
   const categoryStats: CategoryStat[] = [
@@ -48,11 +50,6 @@ const SelectPage = () => {
       console.log('[Select] 获取所有灵感:', res.data)
       if (res.data?.data) {
         setAllInspirations(res.data.data)
-        // 更新分类统计
-        const data = res.data.data as InspirationItem[]
-        categoryStats.forEach(stat => {
-          stat.count = data.filter(i => i.primary_tag === stat.tag).length
-        })
       }
     } catch (err) {
       console.error('[Select] 获取失败:', err)
@@ -114,11 +111,11 @@ const SelectPage = () => {
     })
   }
 
-  // 全选当前tab
+  // 全选当前分类
   const selectAll = () => {
-    const items = activeTab === '全部' 
+    const items = activeCategory === '全部' 
       ? allInspirations 
-      : allInspirations.filter(i => i.primary_tag === activeTab)
+      : allInspirations.filter(i => i.primary_tag === activeCategory)
     setSelectedIds(prev => {
       const newSet = new Set(prev)
       items.forEach(i => newSet.add(i.id))
@@ -126,11 +123,11 @@ const SelectPage = () => {
     })
   }
 
-  // 取消全选当前tab
+  // 取消全选当前分类
   const deselectAll = () => {
-    const items = activeTab === '全部' 
+    const items = activeCategory === '全部' 
       ? allInspirations 
-      : allInspirations.filter(i => i.primary_tag === activeTab)
+      : allInspirations.filter(i => i.primary_tag === activeCategory)
     setSelectedIds(prev => {
       const newSet = new Set(prev)
       items.forEach(i => newSet.delete(i.id))
@@ -148,17 +145,24 @@ const SelectPage = () => {
     Taro.navigateTo({ url: `/pages/generate/index?selected=${selected}` })
   }
 
-  // 根据tab筛选
-  const filteredInspirations = activeTab === '全部' 
+  // 根据分类筛选
+  const filteredInspirations = activeCategory === '全部' 
     ? allInspirations 
-    : allInspirations.filter(i => i.primary_tag === activeTab)
+    : allInspirations.filter(i => i.primary_tag === activeCategory)
 
-  // 更新分类统计
+  // 获取分类统计
   const getStats = () => {
     return categoryStats.map(stat => ({
       ...stat,
       count: allInspirations.filter(i => i.primary_tag === stat.tag).length
     }))
+  }
+
+  // 获取当前选中分类的标签
+  const getCurrentCategoryLabel = () => {
+    if (activeCategory === '全部') return '🏠 全部'
+    const stat = getStats().find(s => s.tag === activeCategory)
+    return stat ? `${stat.icon} ${stat.label}` : '🏠 全部'
   }
 
   return (
@@ -174,28 +178,46 @@ const SelectPage = () => {
         </Badge>
       </View>
 
-      {/* Tab 分类切换 */}
-      <View className="bg-white border-b border-gray-100 px-4">
-        <View className="flex overflow-x-auto">
-          <View 
-            className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 ${
-              activeTab === '全部' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500'
-            }`}
-            onClick={() => setActiveTab('全部')}
-          >
-            全部 {allInspirations.length}
+      {/* 分类筛选 */}
+      <View className="bg-white border-b border-gray-100 px-4 py-3">
+        <View className="flex items-center gap-3">
+          <View className="flex items-center">
+            <SlidersHorizontal size={16} color="#6b7280" />
+            <Text className="block text-sm text-gray-600 ml-2">筛选：</Text>
           </View>
-          {getStats().map(stat => (
-            <View 
-              key={stat.tag}
-              className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 ${
-                activeTab === stat.tag ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500'
-              }`}
-              onClick={() => setActiveTab(stat.tag)}
+          
+          <View className="flex-1">
+            <Select
+              value={activeCategory}
+              onValueChange={(value) => setActiveCategory(value)}
             >
-              {stat.icon} {stat.count}
-            </View>
-          ))}
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="选择分类" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="全部">🏠 全部</SelectItem>
+                <SelectItem value="景点">🏛️ 景点</SelectItem>
+                <SelectItem value="美食">🍜 美食</SelectItem>
+                <SelectItem value="购物">🛍️ 购物</SelectItem>
+                <SelectItem value="活动">🎭 活动</SelectItem>
+              </SelectContent>
+            </Select>
+          </View>
+          
+          <View className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              全部 {allInspirations.length}
+            </Badge>
+            {getStats().filter(s => s.count > 0).map(stat => (
+              <Badge 
+                key={stat.tag}
+                className="text-xs"
+                style={{ backgroundColor: stat.bgColor, color: stat.color }}
+              >
+                {stat.icon} {stat.count}
+              </Badge>
+            ))}
+          </View>
         </View>
       </View>
 
@@ -210,7 +232,7 @@ const SelectPage = () => {
             <Sparkles size={40} color="#9ca3af" />
           </View>
           <Text className="block text-gray-600 text-center mb-2">
-            {activeTab === '全部' ? '还没有灵感点' : `还没有${activeTab}灵感点`}
+            {activeCategory === '全部' ? '还没有灵感点' : `还没有${activeCategory}灵感点`}
           </Text>
           <Text className="block text-gray-400 text-sm text-center">
             去首页粘贴链接收录灵感
@@ -221,7 +243,7 @@ const SelectPage = () => {
           {/* 全选/取消全选 */}
           <View className="flex items-center justify-between mb-2">
             <Text className="text-sm text-gray-500">
-              {filteredInspirations.length} 个灵感点
+              {getCurrentCategoryLabel()} · {filteredInspirations.length} 个灵感点
             </Text>
             <Text 
               className="text-sm text-blue-500"
