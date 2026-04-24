@@ -75,11 +75,20 @@ export class TripService {
 
   // 批量添加灵感
   async batchAddInspirations(inputs: InspirationInput[]) {
+    console.log(`[TripService] batchAddInspirations - 准备插入 ${inputs.length} 条记录`)
+    console.log(`[TripService] 示例数据:`, JSON.stringify(inputs[0]))
+    
     const { data, error } = await this.client
       .from('inspirations')
       .insert(inputs)
       .select()
-    if (error) throw new Error(`批量添加灵感失败: ${error.message}`)
+    
+    if (error) {
+      console.error(`[TripService] Supabase 错误:`, JSON.stringify(error))
+      throw new Error(`批量添加灵感失败: ${error.message}`)
+    }
+    
+    console.log(`[TripService] 插入成功，返回 ${data?.length || 0} 条记录`)
     return data
   }
 

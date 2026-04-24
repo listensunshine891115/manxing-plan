@@ -277,13 +277,17 @@ export default function Index() {
         data: { items }
       })
 
-      if (res.data?.success) {
+      console.log('[Save] 保存响应:', JSON.stringify(res))
+      
+      // 检查 code 字段或 success 字段
+      if (res.data?.code === 200 || res.data?.success) {
         Taro.showToast({ title: `已收录 ${selectedPoints.length} 个灵感点`, icon: 'success' })
         setShowPreviewDialog(false)
         setPreviewPoints([])
         fetchInspirations()
       } else {
-        Taro.showToast({ title: res.data?.message || '保存失败', icon: 'none' })
+        console.error('[Save] 保存失败:', res.data)
+        Taro.showToast({ title: res.data?.message || res.data?.msg || '保存失败', icon: 'none' })
       }
     } catch (error) {
       console.error('保存失败:', error)
