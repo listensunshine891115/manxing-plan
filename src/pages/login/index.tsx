@@ -4,17 +4,19 @@ import { View, Text } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { MapPin, Sparkles } from 'lucide-react-taro'
-import { Network } from '@/network'
+import { MapPin, Sparkles, Copy, Check, MessageCircle } from 'lucide-react-taro'
 import './login.css'
 
 export default function Login() {
   const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [userInfo, setUserInfo] = useState<{
     id: string
     openid: string
     nickname: string
     avatar: string
+    user_code: string
+    wx_openid: string
     inspiration_count: number
   } | null>(null)
 
@@ -45,36 +47,18 @@ export default function Login() {
         return
       }
 
-      // 2. 调用后端接口获取/创建用户
-      let userId = ''
-      try {
-        const res = await Network.request({
-          url: '/api/message/user',
-          method: 'GET',
-          data: { openid: loginRes.code } // 实际项目中后端会通过 code 换取 openid
-        })
-        console.log('[GET] /api/message/user - Response:', JSON.stringify(res.data))
-        if (res.data?.data) {
-          userId = res.data.data.id
-        }
-      } catch (e) {
-        console.error('获取用户信息失败，使用本地模拟:', e)
-      }
-
-      // 3. 如果后端未返回用户，手动创建本地用户
-      if (!userId) {
-        userId = 'user_' + Date.now()
-      }
-
-      // 4. 保存用户信息
+      // 2. 模拟获取用户信息和用户码（实际项目中由后端返回）
       const user = {
-        id: userId,
+        id: 'user_' + Date.now(),
         openid: loginRes.code,
         nickname: '旅行者',
         avatar: '',
+        user_code: generateUserCode(),
+        wx_openid: '',  // 未绑定公众号
         inspiration_count: 0
       }
 
+      // 3. 保存用户信息
       await Taro.setStorage({ key: 'userInfo', data: user })
       setUserInfo(user)
 
@@ -91,6 +75,30 @@ export default function Login() {
     await Taro.removeStorage({ key: 'userInfo' })
     setUserInfo(null)
     Taro.showToast({ title: '已退出登录', icon: 'success' })
+  }
+
+  // 复制用户码
+  const handleCopyCode = () => {
+    if (!userInfo?.user_code) return
+    
+    Taro.setClipboardData({
+      data: userInfo.user_code,
+      success: () => {
+        setCopied(true)
+        Taro.showToast({ title: '已复制用户码', icon: 'success' })
+        setTimeout(() => setCopied(false), 2000)
+      }
+    })
+  }
+
+  // 生成用户码
+  const generateUserCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    let code = ''
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return code
   }
 
   return (
@@ -127,31 +135,76 @@ export default function Login() {
               </View>
             </CardHeader>
             <CardContent className="space-y-4">
-              <View className="bg-blue-50 rounded-xl p-4">
-                <Text className="block text-sm text-blue-800 font-medium mb-2">
-                  如何收集灵感？
+              {/* 用户码 */}
+              <View className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4">
+                <Text className="block text-xs text-gray-500 mb-2">
+                  您的专属用户码
                 </Text>
-                <View className="text-sm text-blue-700 space-y-1">
-                  <Text className="block">1. 关注旅行助手公众号</Text>
-                  <Text className="block">2. 发送旅行相关的分享链接</Text>
-                  <Text className="block">3. 返回小程序查看已收录的灵感</Text>
+                <View className="flex items-center justify-between">
+                  <Text className="block text-2xl font-mono font-bold text-blue-600 tracking-widest">
+                    {userInfo.user_code}
+                  </Text>
+                  <Button
+                    className="bg-white border border-blue-200"
+                    onClick={handleCopyCode}
+                  >
+                    {copied ? (
+                      <>
+                        <Check size={14} color="#22c55e" />
+                        <Text className="ml-1 text-green-600">已复制</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} color="#3b82f6" />
+                        <Text className="ml-1 text-blue-600">复制</Text>
+                      </>
+                    )}
+                  </Button>
                 </View>
               </View>
 
-              <View className="flex gap-3">
-                <Button
-                  className="flex-1 bg-blue-500"
-                  onClick={() => Taro.switchTab({ url: '/pages/index/index' })}
-                >
-                  <Text className="text-white">进入灵感库</Text>
-                </Button>
-                <Button
-                  className="flex-1 bg-white border border-gray-200"
-                  onClick={handleLogout}
-                >
-                  <Text className="text-gray-700">退出登录</Text>
-                </Button>
-              </View>
+              {/* 绑定状态 */}
+              {userInfo.wx_openid ? (
+                <View className="bg-green-50 rounded-xl p-4">
+                  <View className="flex items-center gap-2 mb-1">
+                    <Check size={16} color="#22c55e" />
+                    <Text className="block text-sm text-green-800 font-medium">
+                      公众号已绑定
+                    </Text>
+                  </View>
+                  <Text className="block text-xs text-green-700">
+                    您可以直接在公众号发送链接进行收录
+                  </Text>
+                </View>
+              ) : (
+                <View className="bg-amber-50 rounded-xl p-4">
+                  <View className="flex items-center gap-2 mb-2">
+                    <MessageCircle size={16} color="#f59e0b" />
+                    <Text className="block text-sm text-amber-800 font-medium">
+                      绑定公众号（推荐）
+                    </Text>
+                  </View>
+                  <View className="text-sm text-amber-700 space-y-1">
+                    <Text className="block">1. 关注旅行助手公众号</Text>
+                    <Text className="block">2. 发送「绑定#{userInfo.user_code}」</Text>
+                    <Text className="block">3. 之后发链接自动收录到灵感库</Text>
+                  </View>
+                </View>
+              )}
+
+              <Button
+                className="w-full bg-blue-500"
+                onClick={() => Taro.switchTab({ url: '/pages/index/index' })}
+              >
+                <Text className="text-white">进入灵感库</Text>
+              </Button>
+
+              <Button
+                className="w-full bg-white border border-gray-200"
+                onClick={handleLogout}
+              >
+                <Text className="text-gray-700">退出登录</Text>
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -163,22 +216,22 @@ export default function Login() {
                   欢迎来到旅行灵感库
                 </Text>
                 <Text className="block text-sm text-gray-500">
-                  登录后即可开始收集旅行灵感，规划完美行程
+                  登录后获取您的专属用户码，绑定公众号后发送链接自动收录
                 </Text>
               </View>
 
               <View className="space-y-4">
                 <View className="bg-gray-50 rounded-xl p-4">
                   <Text className="block text-sm text-gray-700 font-medium mb-3">
-                    收集灵感的方式
+                    使用流程
                   </Text>
-                  <View className="space-y-2">
+                  <View className="space-y-3">
                     <View className="flex items-start gap-3">
                       <View className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
                         <Text className="text-white text-xs font-bold">1</Text>
                       </View>
                       <Text className="block text-sm text-gray-600">
-                        关注公众号，发送旅行链接
+                        微信一键登录，获取用户码
                       </Text>
                     </View>
                     <View className="flex items-start gap-3">
@@ -186,7 +239,7 @@ export default function Login() {
                         <Text className="text-white text-xs font-bold">2</Text>
                       </View>
                       <Text className="block text-sm text-gray-600">
-                        链接自动解析收录到灵感库
+                        关注公众号，发送「绑定#用户码」
                       </Text>
                     </View>
                     <View className="flex items-start gap-3">
@@ -194,7 +247,7 @@ export default function Login() {
                         <Text className="text-white text-xs font-bold">3</Text>
                       </View>
                       <Text className="block text-sm text-gray-600">
-                        在小程序勾选灵感，自动生成路线
+                        发送旅行链接，自动收录灵感
                       </Text>
                     </View>
                   </View>

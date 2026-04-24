@@ -13,78 +13,114 @@ export class MessageController {
 
   /**
    * 处理微信公众号用户发送的消息
-   * 
-   * 微信服务器会发送 XML 格式的消息：
-   * <xml>
-   *   <ToUserName><![CDATA[公众号ID]]></ToUserName>
-   *   <FromUserName><![CDATA[用户OpenID]]></FromUserName>
-   *   <MsgType><![CDATA[text]]></MsgType>
-   *   <Content><![CDATA[用户发送的内容]]></Content>
-   *   <CreateTime>1234567890</CreateTime>
-   * </xml>
    */
   @Post('receive')
   async receiveMessage(@Body() body: {
-    ToUserName?: string   // 公众号ID
-    FromUserName?: string // 用户OpenID（关键！）
-    MsgType?: string      // 消息类型：text/image/link等
-    Content?: string       // 文本内容
-    Url?: string           // 链接内容（分享链接时）
-    Title?: string         // 链接标题
-    Description?: string   // 链接描述
-    CreateTime?: number    // 创建时间
+    ToUserName?: string
+    FromUserName?: string  // 公众号用户 OpenID
+    MsgType?: string
+    Content?: string
+    Url?: string
+    Title?: string
+    Description?: string
   }) {
     console.log('[WeChat] 收到消息:', JSON.stringify(body))
 
-    const openid = body.FromUserName || body.openid
+    const wxOpenid = body.FromUserName
     const content = body.Content || body.Url || ''
 
-    // 1. 验证 openid
-    if (!openid) {
+    if (!wxOpenid) {
       return this.replyText('', '消息格式错误')
     }
 
-    // 2. 确保用户已注册
-    let user = await this.userService.getUserByOpenid(openid)
-    if (!user) {
-      user = await this.userService.getOrCreateUser(openid)
-      console.log('[WeChat] 新用户注册:', openid)
-    }
-
-    // 3. 处理不同消息类型
+    // 处理不同消息类型
     const msgType = body.MsgType || 'text'
 
-    if (msgType === 'link' || this.isUrl(content)) {
-      // 链接消息 - 解析并收录
-      const url = body.Url || this.extractUrl(content)
-      if (url) {
-        return await this.handleLinkMessage(user.id, url, body.Title, body.Description, openid)
-      }
+    // 1. 检查是否是绑定命令
+    if (content.startsWith('绑定#') || content.startsWith('绑定')) {
+      return await this.handleBindCommand(wxOpenid, content)
     }
 
-    if (this.isUrl(content)) {
-      // 文本消息中的链接 - 解析并收录
-      const url = this.extractUrl(content)
-      if (url) {
-        return await this.handleLinkMessage(user.id, url, '', '', openid)
-      }
+    // 2. 检查是否已绑定
+    const user = await this.userService.getUserByWxOpenid(wxOpenid)
+    
+    if (!user) {
+      // 未绑定，返回引导消息
+      return this.replyText(wxOpenid, `您还未绑定小程序账号
+
+请先打开小程序获取您的用户码，然后发送：
+绑定#用户码
+
+例如：绑定#ABC123`)
     }
 
-    // 4. 非链接消息 - 返回欢迎/帮助信息
-    return this.replyText(openid, `欢迎使用旅行灵感库！🎉
+    // 3. 处理链接
+    const url = body.Url || this.extractUrl(content)
+    if (url) {
+      return await this.handleLinkMessage(user.id, url, body.Title, body.Description, wxOpenid)
+    }
 
-请发送您收藏的旅行链接，我会自动帮您解析并收录到灵感库。
+    // 4. 非链接消息，返回欢迎信息
+    return this.replyText(wxOpenid, `欢迎回来！🎉
 
-支持：小红书、大众点评、大麦、携程、马蜂窝等平台的分享链接。
+已绑定账号：${user.nickname}
 
-收录后打开小程序即可查看并规划路线。`)
+请发送旅行相关的分享链接，我会自动帮您收录到灵感库。`)
 
+  }
+
+  /**
+   * 处理绑定命令
+   */
+  private async handleBindCommand(wxOpenid: string, content: string) {
+    // 提取用户码
+    const match = content.match(/绑定#?([A-Z0-9]{6,8})/i)
+    if (!match) {
+      return this.replyText(wxOpenid, `绑定格式错误
+
+请发送：绑定#您的用户码
+例如：绑定#ABC123
+
+您可以在小程序中查看您的用户码。`)
+    }
+
+    const userCode = match[1].toUpperCase()
+    
+    // 查找对应的用户
+    const user = await this.userService.getUserByCode(userCode)
+    if (!user) {
+      return this.replyText(wxOpenid, `用户码 ${userCode} 不存在
+
+请确认您的小程序用户码是否正确，或重新打开小程序获取新的用户码。`)
+    }
+
+    // 检查是否已被其他账号绑定
+    if (user.wx_openid && user.wx_openid !== wxOpenid) {
+      return this.replyText(wxOpenid, `该用户码已被其他账号绑定
+
+每个用户码只能绑定一个公众号账号。如需重新绑定，请联系客服。`)
+    }
+
+    // 执行绑定
+    try {
+      await this.userService.bindWechatOpenid(user.id, wxOpenid)
+      
+      return this.replyText(wxOpenid, `绑定成功！🎉
+
+账号：${user.nickname}
+用户码：${user.user_code}
+
+现在您可以发送旅行链接，我会自动收录到您的灵感库。`)
+    } catch (error) {
+      console.error('绑定失败:', error)
+      return this.replyText(wxOpenid, `绑定失败，请稍后重试`)
+    }
   }
 
   /**
    * 处理链接消息
    */
-  private async handleLinkMessage(userId: string, url: string, title?: string, desc?: string, openid?: string) {
+  private async handleLinkMessage(userId: string, url: string, title?: string, desc?: string, wxOpenid?: string) {
     try {
       console.log('[WeChat] 解析链接:', url)
       
@@ -97,7 +133,7 @@ export class MessageController {
         hotel: '🏨'
       }[result.type] || '📍'
 
-      return this.replyText(openid, `${typeEmoji} 已收录！
+      return this.replyText(wxOpenid, `${typeEmoji} 已收录！
 
 ${result.title || title || '未知标题'}
 
@@ -108,7 +144,7 @@ ${result.title || title || '未知标题'}
 
     } catch (error) {
       console.error('[WeChat] 解析失败:', error)
-      return this.replyText(openid, `收录失败，请检查链接是否有效
+      return this.replyText(wxOpenid, `收录失败，请检查链接是否有效
 
 支持的平台：
 • 小红书
@@ -120,29 +156,18 @@ ${result.title || title || '未知标题'}
   }
 
   /**
-   * 回复文本消息（微信 XML 格式）
+   * 回复文本消息
    */
-  private replyText(openid: string, content: string): { xml: any } {
-    if (!openid) {
-      return { xml: { Content: '系统繁忙，请稍后重试' } }
-    }
-
+  private replyText(wxOpenid: string, content: string): { xml: any } {
     return {
       xml: {
-        ToUserName: openid,
-        FromUserName: 'gh_xxxxxxx', // 实际应配置为公众号ID
+        ToUserName: wxOpenid,
+        FromUserName: 'gh_xxxxxxx', // 需配置为公众号ID
         CreateTime: Math.floor(Date.now() / 1000),
         MsgType: 'text',
         Content: content
       }
     }
-  }
-
-  /**
-   * 判断是否URL
-   */
-  private isUrl(content: string): boolean {
-    return /https?:\/\//.test(content)
   }
 
   /**
@@ -182,6 +207,8 @@ ${result.title || title || '未知标题'}
         openid: user.openid,
         nickname: user.nickname,
         avatar: user.avatar,
+        user_code: user.user_code,
+        wx_openid: user.wx_openid,
         inspiration_count: inspirationCount
       }
     }

@@ -6,16 +6,18 @@ export const users = pgTable(
   "users",
   {
     id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-    openid: varchar("openid", { length: 64 }).unique(), // 微信 openid
+    openid: varchar("openid", { length: 64 }).unique(), // 微信小程序 openid
+    wx_openid: varchar("wx_openid", { length: 64 }).unique(), // 微信公众号 openid
     unionid: varchar("unionid", { length: 64 }), // 微信 unionid
     nickname: varchar("nickname", { length: 50 }), // 昵称
     avatar: varchar("avatar", { length: 500 }), // 头像
-    user_code: varchar("user_code", { length: 10 }).unique(), // 用户码（可选，用于非微信场景）
+    user_code: varchar("user_code", { length: 10 }).unique().notNull(), // 用户码，用于公众号绑定
     create_time: timestamp("create_time", { withTimezone: true }).defaultNow().notNull(),
     update_time: timestamp("update_time", { withTimezone: true }),
   },
   (table) => [
     index("users_openid_idx").on(table.openid),
+    index("users_wx_openid_idx").on(table.wx_openid),
     index("users_user_code_idx").on(table.user_code),
   ]
 )
