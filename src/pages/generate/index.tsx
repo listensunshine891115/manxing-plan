@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Slider } from '@/components/ui/slider'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ArrowLeft, CalendarDays, Clock, Wallet, Car, Bus, Sparkles, MapPin, Users, ChevronRight } from 'lucide-react-taro'
+import { ArrowLeft, CalendarDays, Clock, Wallet, Car, Bus, Sparkles, MapPin, Users, ChevronRight, Loader } from 'lucide-react-taro'
 import { format } from 'date-fns'
 import { Network } from '@/network'
+import Taro from '@tarojs/taro'
 import './index.css'
 
 // 出行需求选项
@@ -18,6 +19,58 @@ const demandOptions = [
   { value: 'culture', label: '文化沉浸', icon: '🏛️', desc: '博物馆、历史' }
 ]
 
+// 灵感点类型
+interface InspirationItem {
+  id: string
+  title: string
+  image?: string
+  type?: string
+  location_name?: string
+  location_lat?: number
+  location_lng?: number
+  rating?: number
+  note?: string
+}
+
+// 路线规划结果类型
+interface RoutePlanResult {
+  route: Array<{
+    id: string
+    title: string
+    image?: string
+    type?: string
+    location: { name: string; lat: number; lng: number }
+    locationSource: 'original' | 'mock'
+    distance?: number
+  }>
+  statistics: {
+    totalPoints: number
+    locatedPoints: number
+    totalDistance: number
+  }
+  itinerary: Array<{
+    day: number
+    date: string
+    items: Array<{
+      id: string
+      inspirationId: string
+      title: string
+      image: string
+      location: { name: string; lat: number; lng: number }
+      type: string
+      startTime: string
+      duration: number
+      distance?: number
+      note?: string
+    }>
+  }>
+  settings: {
+    days: number
+    startDate: string
+    mainDestination?: string
+  }
+}
+
 export default function Generate() {
   // 出行设置
   const [startDate, setStartDate] = useState<Date>(new Date())
@@ -27,41 +80,110 @@ export default function Generate() {
   const [selectedDemand, setSelectedDemand] = useState<string>('relax')
   const [mainDestination, setMainDestination] = useState('')
   const [showCalendar, setShowCalendar] = useState(false)
-  
+
+  // 选中的灵感点
+  const [selectedInspirations, setSelectedInspirations] = useState<InspirationItem[]>([])
+  const [loadingInspiration, setLoadingInspiration] = useState(false)
+
   // 生成状态
   const [generating, setGenerating] = useState(false)
 
-  // 模拟当前用户
-  const userId = 'user_' + Date.now()
+  // 获取 URL 参数
+  useEffect(() => {
+    const router = Taro.getCurrentInstance().router
+    if (router) {
+      const params = router.params
+      console.log('[Generate] URL params:', params)
+
+      // 获取选中的灵感点 ID
+      if (params.selected) {
+        const ids = params.selected.split(',')
+        fetchSelectedInspirations(ids)
+      }
+    }
+  }, [])
+
+  // 获取选中的灵感点详情
+  const fetchSelectedInspirations = async (ids: string[]) => {
+    setLoadingInspiration(true)
+    try {
+      const inspirations: InspirationItem[] = []
+
+      // 逐个获取灵感点详情
+      for (const id of ids) {
+        const res = await Network.request({
+          url: `/api/trip/inspirations/${id}`
+        })
+        console.log(`[GET] /api/trip/inspirations/${id} - Response:`, res.data)
+
+        if (res.data && res.data.data) {
+          inspirations.push(res.data.data)
+        }
+      }
+
+      setSelectedInspirations(inspirations)
+      console.log('[Generate] 获取到的灵感点:', inspirations)
+    } catch (error) {
+      console.error('获取灵感点失败:', error)
+      Taro.showToast({ title: '获取灵感点失败', icon: 'none' })
+    } finally {
+      setLoadingInspiration(false)
+    }
+  }
 
   // 生成路线
   const handleGenerate = async () => {
+    if (selectedInspirations.length === 0) {
+      Taro.showToast({ title: '请先选择灵感点', icon: 'none' })
+      return
+    }
+
     setGenerating(true)
-    
+
     try {
-      // 调用后端生成路线
+      // 调用后端路线规划 API
+      const inspirationsData = selectedInspirations.map(ins => ({
+        id: ins.id,
+        title: ins.title,
+        image: ins.image,
+        type: ins.type,
+        location: (ins.location_lat && ins.location_lng)
+          ? { name: ins.location_name || ins.title, lat: ins.location_lat, lng: ins.location_lng }
+          : undefined,
+        location_str: ins.location_name,
+        rating: ins.rating,
+        note: ins.note
+      }))
+
       const res = await Network.request({
-        url: '/api/trip/generate',
+        url: '/api/trip/route/plan',
         method: 'POST',
         data: {
-          userId,
-          settings: {
-            start_date: format(startDate, 'yyyy-MM-dd'),
-            days,
-            budget: budget > 0 ? budget : undefined,
-            transport_mode: transportMode,
-            demand: selectedDemand,
-            main_destination: mainDestination
-          }
+          inspirations: inspirationsData,
+          mainDestination,
+          days,
+          startDate: format(startDate, 'yyyy-MM-dd')
         }
       })
-      
-      console.log('[POST] /api/trip/generate - Response:', JSON.stringify(res.data))
-      
-      // 跳转到路线展示页
-      window.location.href = '/pages/route/index'
+
+      console.log('[POST] /api/trip/route/plan - Response:', res.data)
+
+      // 检查响应
+      if (res.data && res.data.code === 200 && res.data.data) {
+        const result: RoutePlanResult = res.data.data
+
+        // 将结果存储到全局或跳转时传递
+        // 使用 Taro.setStorage 存储路线规划结果
+        await Taro.setStorage({ key: 'routePlanResult', data: result })
+
+        // 跳转到路线展示页
+        Taro.navigateTo({ url: '/pages/route/index' })
+      } else {
+        throw new Error(res.data?.msg || '路线规划失败')
+      }
     } catch (error) {
       console.error('生成路线失败:', error)
+      Taro.showToast({ title: '生成路线失败，请重试', icon: 'none' })
       setGenerating(false)
     }
   }
@@ -100,6 +222,52 @@ export default function Generate() {
           <Text className="block text-lg font-semibold text-foreground ml-2">出行设置</Text>
         </View>
       </View>
+
+      {/* 选中的灵感点预览 */}
+      {selectedInspirations.length > 0 && (
+        <View className="px-4 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+          <View className="flex items-center justify-between mb-3">
+            <Text className="block text-sm font-medium text-blue-700">
+              已选择 {selectedInspirations.length} 个灵感点
+            </Text>
+            <Text 
+              className="block text-xs text-blue-500"
+              onClick={() => Taro.navigateBack()}
+            >
+              返回修改
+            </Text>
+          </View>
+          {loadingInspiration ? (
+            <View className="flex items-center py-2">
+              <Loader size={16} color="#3b82f6" className="animate-spin" />
+              <Text className="block text-xs text-gray-500 ml-2">加载中...</Text>
+            </View>
+          ) : (
+            <View className="flex flex-wrap gap-2">
+              {selectedInspirations.slice(0, 6).map(ins => (
+                <View 
+                  key={ins.id}
+                  className="px-3 py-2 bg-white rounded-full border border-blue-200 flex items-center"
+                >
+                  <Text className="block text-xs text-gray-700">
+                    {ins.type === 'food' ? '🍜' : ins.type === 'shopping' ? '🛍️' : '🏛️'}
+                  </Text>
+                  <Text className="block text-xs text-gray-700 ml-1 max-w-24 truncate">
+                    {ins.title}
+                  </Text>
+                </View>
+              ))}
+              {selectedInspirations.length > 6 && (
+                <View className="px-3 py-2 bg-white rounded-full bg-opacity-50">
+                  <Text className="block text-xs text-gray-500">
+                    +{selectedInspirations.length - 6} 更多
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+      )}
 
       {/* 设置表单 */}
       <View className="px-4 py-5 space-y-5">

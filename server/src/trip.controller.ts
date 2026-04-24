@@ -99,6 +99,60 @@ export class TripController {
     return { code: 200, msg: 'success', data }
   }
 
+  // ==================== 路线规划 ====================
+
+  // 基于地理位置的智能路线规划
+  @Post('route/plan')
+  async planRoute(@Body() body: {
+    inspirations: Array<{
+      id: string
+      title: string
+      image?: string
+      type?: string
+      location?: { name: string; lat: number; lng: number }
+      location_str?: string
+      rating?: number
+      note?: string
+    }>
+    mainDestination?: string
+    days?: number
+    startDate?: string
+  }) {
+    console.log(`[POST] /api/trip/route/plan - inspirations: ${body.inspirations?.length || 0} 个`)
+    console.log(`[POST] /api/trip/route/plan - mainDestination: ${body.mainDestination || '未指定'}`)
+    console.log(`[POST] /api/trip/route/plan - days: ${body.days || 1}`)
+
+    const result = await this.tripService.planRouteByLocation(
+      body.inspirations,
+      body.mainDestination,
+      body.days || 1
+    )
+
+    // 生成分天行程
+    const dailyItinerary = this.tripService.generateDailyItinerary(
+      result.optimizedRoute,
+      body.days || 1,
+      body.startDate || new Date().toISOString().split('T')[0]
+    )
+
+    console.log(`[POST] /api/trip/route/plan - 完成，生成 ${dailyItinerary.length} 天行程`)
+
+    return {
+      code: 200,
+      msg: 'success',
+      data: {
+        route: result.optimizedRoute,
+        statistics: result.statistics,
+        itinerary: dailyItinerary,
+        settings: {
+          days: body.days || 1,
+          startDate: body.startDate || new Date().toISOString().split('T')[0],
+          mainDestination: body.mainDestination
+        }
+      }
+    }
+  }
+
   // ==================== 行程管理 ====================
 
   // 获取行程列表
