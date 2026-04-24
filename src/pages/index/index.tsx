@@ -190,6 +190,8 @@ export default function Index() {
 
     setPasting(true)
     try {
+      console.log('[Paste] 开始预览，URL:', isUrl ? linkInput.trim() : '纯文字')
+      
       // 先预览多个灵感点
       const previewRes = await Network.request({
         url: '/api/trip/preview',
@@ -201,7 +203,8 @@ export default function Index() {
         }
       })
       
-      console.log('预览结果:', previewRes.data)
+      console.log('[Paste] 预览响应:', JSON.stringify(previewRes))
+      console.log('[Paste] previewRes.data:', JSON.stringify(previewRes?.data))
       
       if (previewRes.data?.success && previewRes.data?.data?.inspirationPoints?.length > 0) {
         // 有关灵感点，展示让用户选择
@@ -211,11 +214,12 @@ export default function Index() {
         setLinkInput('')
       } else {
         // 没有提取到灵感点，直接收录
+        console.log('[Paste] 未能提取到灵感点:', previewRes.data?.message)
         Taro.showToast({ title: previewRes.data?.message || '未能提取到灵感点', icon: 'none' })
       }
-    } catch (error) {
-      console.error('预览失败:', error)
-      Taro.showToast({ title: '预览失败', icon: 'none' })
+    } catch (error: any) {
+      console.error('[Paste] 预览失败:', error)
+      Taro.showToast({ title: '预览失败: ' + error.message, icon: 'none' })
     } finally {
       setPasting(false)
     }

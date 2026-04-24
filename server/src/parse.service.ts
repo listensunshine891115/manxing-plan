@@ -163,7 +163,7 @@ export class ParseService {
         title: parsed.name,
         image: parsed.coverImage,
         source: parsed.source,
-        primary_tag: normalizeType(parsed.primaryTag),  // 转换一级标签
+        primary_tag: normalizePrimaryTag(parsed.primaryTag),  // 转换一级标签
         secondary_tag: parsed.secondaryTag,  // 二级标签
         location: parsed.location,
         time: parsed.time,
@@ -645,7 +645,8 @@ ${content || '(无正文内容)'}
         name: '未命名灵感',
         location: '',
         time: '',
-        type: '活动',
+        primaryTag: '景点',
+        secondaryTag: '',
         price: '待定',
         description: content.slice(0, 100) || '无法提取信息',
         source: '',
