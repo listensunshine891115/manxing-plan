@@ -160,27 +160,67 @@ export class ParseService {
             content = fetchResult.content || ''
             title = fetchResult.title || ''
             coverImage = fetchResult.coverImage || ''
+            
+            // 如果没有获取到文本内容，但有图片，尝试 OCR
+            if (!content && fetchResult.imageUrls && fetchResult.imageUrls.length > 0) {
+              console.log(`[Parse] 没有文本内容，尝试从图片提取文字...`)
+              const ocrText = await this.extractTextFromImages(fetchResult.imageUrls)
+              if (ocrText) {
+                content = ocrText
+                console.log(`[Parse] OCR 成功提取 ${ocrText.length} 字符`)
+              }
+            }
           } else {
-            // 降级1：尝试视频提取（可能是视频链接被误判为图文）
-            console.log(`[Parse] 图文获取失败，尝试视频提取...`)
-            const subtitleResult = await this.extractVideoSubtitle(url)
-            if (subtitleResult) {
-              content = subtitleResult
-              title = ''
-            } else {
-              // 降级2：尝试 yt-dlp
-              const ytDlpResult = await this.getVideoInfoWithYtDlp(url)
-              if (ytDlpResult.success) {
-                content = ytDlpResult.description || ytDlpResult.title || ''
-                title = ytDlpResult.title || ''
-                coverImage = ytDlpResult.thumbnail || ''
+            // 降级1：尝试获取图片并 OCR
+            console.log(`[Parse] 图文获取失败，尝试获取图片进行 OCR...`)
+            const fetchResultForImages = await this.fetchUrl(url)
+            if (fetchResultForImages.imageUrls && fetchResultForImages.imageUrls.length > 0) {
+              const ocrText = await this.extractTextFromImages(fetchResultForImages.imageUrls)
+              if (ocrText) {
+                console.log(`[Parse] OCR 成功提取 ${ocrText.length} 字符`)
+                content = ocrText
+                title = ''
+                coverImage = fetchResultForImages.coverImage || ''
               } else {
-                // 降级3：从输入文字中提取内容
+                // 降级2：尝试视频提取
+                const videoContent = await this.tryVideoExtraction(url, input)
+                if (videoContent) {
+                  content = videoContent
+                } else {
+                  // 降级3：使用输入文字
+                  const textContent = this.extractTextFromInput(input.url || input.text || '')
+                  if (textContent) {
+                    content = textContent
+                  } else {
+                    // 降级4：直接返回原始文字内容
+                    return {
+                      success: true,
+                      data: {
+                        name: this.extractTextFromInput(input.url || input.text || ''),
+                        source: '社交平台',
+                        type: '图文',
+                        location_name: '',
+                        time: '',
+                        price: '',
+                        description: input.url || input.text || '',
+                        tags: [],
+                        original_url: url,
+                      },
+                      message: '已收录，但未能获取详细信息'
+                    }
+                  }
+                }
+              }
+            } else {
+              // 降级2：尝试视频提取
+              const videoContent = await this.tryVideoExtraction(url, input)
+              if (videoContent) {
+                content = videoContent
+              } else {
+                // 降级3：使用输入文字
                 const textContent = this.extractTextFromInput(input.url || input.text || '')
                 if (textContent) {
-                  console.log(`[Parse] 图文全部失败，降级使用输入文字: ${textContent.substring(0, 50)}...`)
                   content = textContent
-                  title = ''
                 } else {
                   // 降级4：直接返回原始文字内容
                   return {
@@ -259,6 +299,36 @@ export class ParseService {
     } catch (error: any) {
       console.error(`[Parse] 解析失败:`, error)
       return { success: false, message: `解析失败: ${error.message}` }
+    }
+  }
+
+  // 尝试视频提取（辅助方法）
+  private async tryVideoExtraction(url: string, input: { url?: string; text?: string }): Promise<string | null> {
+    try {
+      console.log(`[Parse] 尝试视频提取...`)
+      const subtitleResult = await this.extractVideoSubtitle(url)
+      if (subtitleResult) {
+        return subtitleResult
+      }
+      
+      // 降级1：尝试 yt-dlp
+      const ytDlpResult = await this.getVideoInfoWithYtDlp(url)
+      if (ytDlpResult.success) {
+        return ytDlpResult.description || ytDlpResult.title || ''
+      }
+      
+      // 降级2：从输入文字中提取内容
+      const textContent = this.extractTextFromInput(input.url || input.text || '')
+      if (textContent) {
+        console.log(`[Parse] 视频提取失败，降级使用输入文字`)
+        return textContent
+      }
+      
+      return null
+    } catch (e: any) {
+      console.log(`[Parse] 视频提取异常: ${e.message}`)
+      // 最后降级：使用输入文字
+      return this.extractTextFromInput(input.url || input.text || '')
     }
   }
 
@@ -675,6 +745,7 @@ export class ParseService {
     content?: string
     title?: string
     coverImage?: string
+    imageUrls?: string[]
     message?: string
   }> {
     try {
@@ -717,15 +788,77 @@ export class ParseService {
         coverImage = firstImage.image.display_url
       }
 
+      // 提取所有图片 URL（用于 OCR）
+      const imageUrls: string[] = response.content
+        .filter(item => item.type === 'image' && item.image?.display_url)
+        .map(item => item.image.display_url as string)
+
       return {
         success: true,
         content: textContent,
         title: response.title || '',
-        coverImage
+        coverImage,
+        imageUrls
       }
     } catch (error: any) {
       console.error(`[Parse] Fetch 失败:`, error)
       return { success: false, message: `获取页面失败: ${error.message}` }
+    }
+  }
+
+  // 从图片提取文字（OCR）
+  private async extractTextFromImages(imageUrls: string[]): Promise<string> {
+    if (!imageUrls || imageUrls.length === 0) {
+      return ''
+    }
+
+    try {
+      console.log(`[Parse] 开始 OCR 提取图片文字，共 ${imageUrls.length} 张图片`)
+
+      const allTexts: string[] = []
+      const maxImages = 3 // 最多处理 3 张图片，避免超时
+
+      for (let i = 0; i < Math.min(imageUrls.length, maxImages); i++) {
+        const imageUrl = imageUrls[i]
+        console.log(`[Parse] OCR 处理第 ${i + 1} 张图片: ${imageUrl}`)
+
+        try {
+          // 下载图片到临时文件
+          const tempFile = `/tmp/ocr_image_${Date.now()}_${i}.jpg`
+          execSync(`curl -s -L "${imageUrl}" -o "${tempFile}" --max-time 15`, { stdio: 'pipe' })
+
+          // 检查文件是否存在且有效
+          const fileStat = execSync(`stat -c%s "${tempFile}" 2>/dev/null || echo 0`).toString().trim()
+          if (parseInt(fileStat) < 1000) {
+            console.log(`[Parse] 图片下载失败或文件过小，跳过`)
+            continue
+          }
+
+          // 使用 tesseract OCR 提取文字
+          const cmd = `tesseract "${tempFile}" stdout -l chi_sim+eng --oem 1 --psm 4 2>/dev/null | head -100`
+          const text = execSync(cmd, { stdio: 'pipe', shell: '/bin/bash', timeout: 30000 }).toString().trim()
+
+          if (text && text.length > 5) {
+            console.log(`[Parse] OCR 提取到 ${text.length} 字符`)
+            allTexts.push(text)
+          }
+
+          // 删除临时文件
+          execSync(`rm -f "${tempFile}"`, { stdio: 'pipe' })
+        } catch (e: any) {
+          console.log(`[Parse] OCR 处理图片失败: ${e.message}`)
+        }
+      }
+
+      if (allTexts.length > 0) {
+        console.log(`[Parse] OCR 共提取 ${allTexts.length} 张图片的文字`)
+        return allTexts.join('\n\n')
+      }
+
+      return ''
+    } catch (error: any) {
+      console.error(`[Parse] OCR 失败:`, error.message)
+      return ''
     }
   }
 
