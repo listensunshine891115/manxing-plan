@@ -1,0 +1,22 @@
+.winner-card {
+  background: var(--card);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid var(--primary);
+}
+
+.winner-header {
+  background: linear-gradient(135deg, var(--primary), #60a5fa);
+  padding: 12px 16px;
+}
+
+.winner-content {
+  padding: 20px 16px;
+}
+
+.other-card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+}

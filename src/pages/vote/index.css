@@ -1,0 +1,31 @@
+.vote-card {
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+
+.vote-card:active {
+  transform: scale(0.98);
+}
+
+.vote-card.voted {
+  border-color: var(--success);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), transparent);
+}
+
+.vote-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.version-badge {
+  background: var(--primary);
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
