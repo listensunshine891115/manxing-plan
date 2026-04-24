@@ -77,7 +77,7 @@ export class ParseService {
       let sourceType: SourceType
       let content: string
       let url: string
-      let title: string
+      let title: string = ''
       let coverImage: string
 
       // 从输入中提取 URL
@@ -216,11 +216,13 @@ export class ParseService {
               const videoContent = await this.tryVideoExtraction(url, input)
               if (videoContent) {
                 content = videoContent
+                title = title || ''
               } else {
                 // 降级3：使用输入文字
                 const textContent = this.extractTextFromInput(input.url || input.text || '')
                 if (textContent) {
                   content = textContent
+                  title = title || ''
                 } else {
                   // 降级4：直接返回原始文字内容
                   return {
@@ -791,7 +793,7 @@ export class ParseService {
       // 提取所有图片 URL（用于 OCR）
       const imageUrls: string[] = response.content
         .filter(item => item.type === 'image' && item.image?.display_url)
-        .map(item => item.image.display_url as string)
+        .map(item => item.image!.display_url as string)
 
       return {
         success: true,
