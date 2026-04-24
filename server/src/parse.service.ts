@@ -5,7 +5,7 @@ import { AsrService } from './asr.service'
 import { AudioService } from './audio.service'
 import { VideoParseService } from './video-parse.service'
 import { execSync } from 'child_process'
-import playwright from 'playwright'
+import * as playwright from 'playwright'
 
 // 类型映射：中文 -> 中文一级标签
 const primaryTagMap: Record<string, string> = {
