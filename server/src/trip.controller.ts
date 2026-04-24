@@ -171,6 +171,18 @@ export class TripController {
     return { code: 200, msg: 'success', data }
   }
 
+  // 创建行程
+  @Post('trips')
+  async createTrip(@Body() body: {
+    name?: string
+    content?: any
+    settings?: any
+  }) {
+    console.log(`[POST] /api/trip/trips - body:`, JSON.stringify(body))
+    const data = await this.tripService.createTrip(body)
+    return { code: 200, msg: 'success', data }
+  }
+
   // 获取单个行程
   @Get('trips/:id')
   async getTripById(@Param('id') id: string) {

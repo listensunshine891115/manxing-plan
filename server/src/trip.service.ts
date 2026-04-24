@@ -175,6 +175,34 @@ export class TripService {
     return data
   }
 
+  // 创建行程
+  async createTrip(params: {
+    name?: string
+    content?: any
+    settings?: any
+  }) {
+    const { name, content, settings } = params
+
+    const { data, error } = await this.client
+      .from('trips')
+      .insert({
+        version_name: name || '我的行程',
+        content: content || {},
+        settings: settings || {},
+        is_final: true
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[TripService] 创建行程失败:', JSON.stringify(error))
+      throw new Error(`创建行程失败: ${error.message}`)
+    }
+
+    console.log('[TripService] 创建行程成功:', JSON.stringify(data))
+    return data
+  }
+
   // 获取单个行程
   async getTripById(id: string) {
     const { data, error } = await this.client

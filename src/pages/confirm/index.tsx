@@ -96,9 +96,16 @@ export default function Confirm() {
         method: 'POST',
         data: {
           name: `行程-${routePlan.settings.startDate}`,
-          itinerary: routePlan.itinerary,
-          settings: routePlan.settings,
-          status: 'confirmed'
+          content: {
+            itinerary: routePlan.itinerary,
+            route: routePlan.route,
+            statistics: routePlan.statistics
+          },
+          settings: {
+            days: routePlan.settings.days,
+            startDate: routePlan.settings.startDate,
+            mainDestination: routePlan.settings.mainDestination
+          }
         }
       })
 
@@ -108,14 +115,18 @@ export default function Confirm() {
         // 清除缓存
         await Taro.removeStorage({ key: 'routePlanResult' })
         
-        // 跳转到个人行程页面
-        Taro.redirectTo({ url: '/pages/preview/index' })
+        Taro.showToast({ title: '保存成功', icon: 'success' })
+        
+        // 延迟跳转，让用户看到成功提示
+        setTimeout(() => {
+          Taro.switchTab({ url: '/pages/preview/index' })
+        }, 1500)
       } else {
         throw new Error(res.data?.msg || '保存失败')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('确认行程失败:', error)
-      Taro.showToast({ title: '保存失败，请重试', icon: 'none' })
+      Taro.showToast({ title: error.message || '保存失败，请重试', icon: 'none' })
       setConfirming(false)
     }
   }
