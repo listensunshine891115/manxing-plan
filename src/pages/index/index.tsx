@@ -9,7 +9,8 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { 
   Sparkles, MapPin, Calendar, ChevronRight, 
-  MessageCircle, Copy, Check, User, X, Link2, Plus
+  MessageCircle, Copy, Check, User, X, Link2, Plus,
+  Settings
 } from 'lucide-react-taro'
 import { Inspiration } from '@/types'
 import { Network } from '@/network'
@@ -43,17 +44,10 @@ export default function Index() {
     wx_openid: string
   } | null>(null)
   
-  // 绑定引导弹窗（首次登录不可关闭）
-  const [showBindGuide, setShowBindGuide] = useState(false)
-  const [isFirstLogin, setIsFirstLogin] = useState(false)
-  
   // 粘贴链接弹窗
   const [showPasteDialog, setShowPasteDialog] = useState(false)
   const [linkInput, setLinkInput] = useState('')
   const [pasting, setPasting] = useState(false)
-  
-  // 用户码复制状态
-  const [codeCopied, setCodeCopied] = useState(false)
 
   // 检查登录状态
   const checkLogin = async () => {
@@ -107,10 +101,13 @@ export default function Index() {
 
       await Taro.setStorage({ key: 'userInfo', data: user })
       setUserInfo(user)
-      setIsFirstLogin(true)
-      setShowBindGuide(true)  // 首次登录强制显示绑定引导
       
       Taro.showToast({ title: '登录成功', icon: 'success' })
+      
+      // 跳转到绑定页面
+      setTimeout(() => {
+        Taro.redirectTo({ url: '/pages/bind-guide/index' })
+      }, 500)
     } catch {
       Taro.showToast({ title: '登录失败', icon: 'none' })
     }
@@ -122,24 +119,14 @@ export default function Index() {
     return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
   }
 
-  // 复制用户码
-  const handleCopyCode = () => {
-    if (!userInfo?.user_code) return
-    Taro.setClipboardData({
-      data: userInfo.user_code,
-      success: () => {
-        setCodeCopied(true)
-        Taro.showToast({ title: '已复制', icon: 'success' })
-        setTimeout(() => setCodeCopied(false), 2000)
-      }
-    })
+  // 跳转到绑定页面
+  const goToBindGuide = () => {
+    Taro.navigateTo({ url: '/pages/bind-guide/index' })
   }
 
-  // 关闭绑定引导（首次登录后可以关闭）
-  const handleCloseBindGuide = async () => {
-    setShowBindGuide(false)
-    setIsFirstLogin(false)
-    await Taro.setStorage({ key: 'bindGuideShown', data: true })
+  // 跳转到设置页面
+  const goToSettings = () => {
+    Taro.navigateTo({ url: '/pages/settings/index' })
   }
 
   // 粘贴链接收录
@@ -266,25 +253,34 @@ export default function Index() {
             </Badge>
           </View>
           
-          <View 
-            className="flex items-center gap-1 px-3 py-1 rounded-full text-xs"
-            style={{ 
-              backgroundColor: userInfo.wx_openid ? '#dcfce7' : '#fef3c7',
-              color: userInfo.wx_openid ? '#16a34a' : '#d97706'
-            }}
-            onClick={() => !userInfo.wx_openid && setShowBindGuide(true)}
-          >
-            {userInfo.wx_openid ? (
-              <>
-                <Check size={12} color="#16a34a" />
-                <Text>已绑定</Text>
-              </>
-            ) : (
-              <>
-                <MessageCircle size={12} color="#d97706" />
-                <Text>未绑定</Text>
-              </>
-            )}
+          <View className="flex items-center gap-2">
+            <View 
+              className="flex items-center gap-1 px-3 py-1 rounded-full text-xs"
+              style={{ 
+                backgroundColor: userInfo.wx_openid ? '#dcfce7' : '#fef3c7',
+                color: userInfo.wx_openid ? '#16a34a' : '#d97706'
+              }}
+              onClick={goToBindGuide}
+            >
+              {userInfo.wx_openid ? (
+                <>
+                  <Check size={12} color="#16a34a" />
+                  <Text>已绑定</Text>
+                </>
+              ) : (
+                <>
+                  <MessageCircle size={12} color="#d97706" />
+                  <Text>未绑定</Text>
+                </>
+              )}
+            </View>
+            
+            <View 
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100"
+              onClick={goToSettings}
+            >
+              <Settings size={18} color="#6b7280" />
+            </View>
           </View>
         </View>
       </View>
@@ -335,7 +331,7 @@ export default function Index() {
             ) : (
               <Text 
                 className="block text-xs text-blue-600 mt-1"
-                onClick={() => setShowBindGuide(true)}
+                onClick={goToBindGuide}
               >
                 点击绑定公众号
               </Text>
@@ -445,82 +441,6 @@ export default function Index() {
           </View>
         </View>
       )}
-
-      {/* 绑定引导弹窗（首次登录不可跳过） */}
-      <Dialog open={showBindGuide} onOpenChange={(open) => isFirstLogin || !open ? undefined : () => handleCloseBindGuide()}>
-        <View className="p-6">
-          {/* 关闭按钮（非首次可关闭） */}
-          {!isFirstLogin && (
-            <View className="flex justify-end mb-2" onClick={handleCloseBindGuide}>
-              <X size={20} color="#9ca3af" />
-            </View>
-          )}
-          
-          <View className="text-center mb-4">
-            <View className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <MessageCircle size={24} color="#3b82f6" />
-            </View>
-            <Text className="block text-lg font-medium text-gray-900">绑定公众号</Text>
-            <Text className="block text-sm text-gray-500 mt-1">
-              绑定后发送链接自动收录到灵感库
-            </Text>
-          </View>
-
-          {/* 公众号二维码 */}
-          <View className="flex justify-center mb-4">
-            <View className="bg-white p-2 rounded-xl border border-gray-200">
-              <View className="w-40 h-40 bg-gray-100 flex items-center justify-center overflow-hidden rounded-lg">
-                <Text className="text-xs text-gray-400">公众号二维码</Text>
-                {/* 实际使用 Image 组件 */}
-                {/* <Image src={MP_QRCODE} className="w-full h-full" mode="aspectFit" /> */}
-              </View>
-            </View>
-          </View>
-
-          {/* 用户码 */}
-          <View className="bg-gray-50 rounded-xl p-4 mb-4">
-            <Text className="block text-xs text-gray-500 mb-2 text-center">或发送用户码给公众号</Text>
-            <View className="flex items-center justify-center gap-3">
-              <Text className="block text-2xl font-mono font-bold text-blue-600 tracking-widest">
-                {userInfo.user_code}
-              </Text>
-              <Button size="sm" className="bg-white border border-gray-200" onClick={handleCopyCode}>
-                {codeCopied ? (
-                  <>
-                    <Check size={12} color="#22c55e" />
-                    <Text className="ml-1 text-green-600">已复制</Text>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={12} color="#3b82f6" />
-                    <Text className="ml-1 text-blue-600">复制</Text>
-                  </>
-                )}
-              </Button>
-            </View>
-          </View>
-
-          {/* 步骤 */}
-          <View className="space-y-2 mb-4">
-            <View className="flex items-start gap-3">
-              <View className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
-                <Text className="text-white text-xs">1</Text>
-              </View>
-              <Text className="block text-sm text-gray-700">扫描上方二维码或搜索「旅行助手」</Text>
-            </View>
-            <View className="flex items-start gap-3">
-              <View className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
-                <Text className="text-white text-xs">2</Text>
-              </View>
-              <Text className="block text-sm text-gray-700">关注公众号并发送「绑定#{userInfo.user_code}」</Text>
-            </View>
-          </View>
-
-          <Button className="w-full bg-blue-500" onClick={handleCloseBindGuide}>
-            <Text className="text-white">知道了</Text>
-          </Button>
-        </View>
-      </Dialog>
 
       {/* 粘贴链接弹窗 */}
       <Dialog open={showPasteDialog} onOpenChange={(open) => !open && setShowPasteDialog(false)}>
