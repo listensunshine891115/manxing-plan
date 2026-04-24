@@ -379,7 +379,7 @@ export default function Index() {
             <Text className="block text-sm font-medium text-green-700 ml-2">粘贴灵感</Text>
           </View>
           <Text className="block text-xs text-green-600 mb-3">
-            种草短视频、票务平台、公众号文章链接，或者直接输入灵感信息
+            直接粘贴种草短视频、票务平台、公众号文章&quot;分享链接&quot;，或输入文字灵感
           </Text>
           <View className="flex gap-2">
             <View className="flex-1 bg-white rounded-lg px-3 py-2">
