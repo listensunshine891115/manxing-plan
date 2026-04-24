@@ -98,29 +98,47 @@ export class AsrService {
     const audioBuffer = fs.readFileSync(audioPath)
     const audioBase64 = audioBuffer.toString('base64')
 
-    // 3. 调用百度 ASR API
+    console.log(`[ASR] 原始音频大小: ${audioBuffer.length} bytes`)
+
+    // 3. 百度 ASR 限制音频大小 10MB，超过则截断到 60 秒
+    // 16kHz 采样率, 单声道, 16bit = 16000 * 1 * 2 = 32000 bytes/秒
+    const maxDuration = 60 // 最大 60 秒
+    const maxSize = 16000 * 1 * 2 * maxDuration // = 1,920,000 bytes
+    let speechData = audioBase64
+    let speechLen = audioBuffer.length
+
+    if (audioBuffer.length > maxSize) {
+      console.log(`[ASR] 音频过长(${audioBuffer.length} bytes)，截断到 ${maxSize} bytes (${maxDuration}秒)`)
+      speechData = audioBase64.substring(0, maxSize * 4 / 3) // base64 每 3 字节编码为 4 字符
+      speechLen = maxSize
+    }
+
+    // 5. 调用百度 ASR API（短语音识别）
+    // 使用 vop.baidu.com/server_api
+    const cuid = `user_${Date.now()}`
     const result = await this.httpRequest({
       method: 'POST',
-      host: 'snrasr.baidu.com',
-      path: '/api/asr',
+      host: 'vop.baidu.com',
+      path: '/server_api',
       headers: {
         'Content-Type': 'application/json',
       }
     }, {
-      dev_pid: devPid,
-      format,
-      rate,
+      format: format,
+      rate: rate,
       channel: 1,
-      token,
-      speech: audioBase64,
-      len: audioBuffer.length,
+      token: token,
+      speech: speechData,
+      len: speechLen,
+      dev_pid: devPid,
+      cuid: cuid,
     })
 
     if (result.err_no === 0 && result.result) {
       return result.result[0]
     }
 
-    console.log(`[ASR] 百度 ASR 错误: ${result.err_msg}`)
+    console.log(`[ASR] 百度 ASR 错误: ${result.err_msg || result.errmsg}`)
     return null
   }
 
@@ -151,6 +169,9 @@ export class AsrService {
    * 讯飞 ASR
    * 文档: https://www.xfyun.cn/doc/asr/voicetranscription/API.html
    */
+  /**
+   * 讯飞 ASR（实时语音转写）
+   */
   private async xunfeiASR(audioPath: string, appId: string, apiKey: string, apiSecret: string): Promise<string | null> {
     const format = 'wav'
     const rate = 16000
@@ -167,7 +188,15 @@ export class AsrService {
       .update(signStr)
       .digest('hex')
 
-    // 构建请求
+    // X-Param 需要包含正确的参数
+    const paramObj = {
+      aue: 'raw',
+      engine_type: 'sms16k',
+      sample: rate,
+    }
+    const paramBase64 = Buffer.from(JSON.stringify(paramObj)).toString('base64')
+
+    // 构建请求 - 使用正确的讯飞语音转写 API
     const body = {
       common: {
         app_id: appId,
@@ -179,37 +208,38 @@ export class AsrService {
       },
       data: {
         status: 2,  // 音频结束
-        format,
+        format: format,
         encoding: 'base64',
         audio: audioBase64,
       },
     }
 
-    const result = await this.httpRequest({
-      method: 'POST',
-      host: 'api.xf-yun.com',
-      path: '/v1/private/s2b52d2fe/deploy/public/para/stream',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Appid': appId,
-        'X-CurTime': ts,
-        'X-Param': Buffer.from(JSON.stringify({
-          aue: 'raw',
-          engine_type: 'sms16k',
-          sample: rate,
-        })).toString('base64'),
-        'X-CheckSum': signature,
+    try {
+      const result = await this.httpRequest({
+        method: 'POST',
+        host: 'api.xf-yun.com',
+        path: '/v1/private/s2b52d2fe/deploy/public/para/stream',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Appid': appId,
+          'X-CurTime': ts,
+          'X-Param': paramBase64,
+          'X-CheckSum': signature,
+        }
+      }, body)
+
+      // 解析讯飞响应
+      if (result.code === 0 && result.data && result.data.result) {
+        const texts = result.data.result.map((r: any) => r.best_text || '')
+        return texts.filter(Boolean).join('')
       }
-    }, body)
 
-    // 解析讯飞响应
-    if (result.code === 0 && result.data && result.data.result) {
-      const texts = result.data.result.map((r: any) => r.best_text || '')
-      return texts.filter(Boolean).join('')
+      console.log(`[ASR] 讯飞 ASR 错误: code=${result.code}, desc=${result.desc || result.message}`)
+      return null
+    } catch (error: any) {
+      console.log(`[ASR] 讯飞 ASR 请求失败: ${error.message}`)
+      return null
     }
-
-    console.log(`[ASR] 讯飞 ASR 错误: ${result.desc || result.message}`)
-    return null
   }
 
   /**

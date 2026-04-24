@@ -28,66 +28,50 @@ export class AudioService {
   async extractAudioFromUrl(videoUrl: string): Promise<string> {
     console.log(`[Audio] 开始提取音频: ${videoUrl}`)
 
-    const outputPath = path.join(this.tempDir, `audio_${Date.now()}.wav`)
+    const timestamp = Date.now()
+    const tempDir = this.tempDir
 
     try {
-      // 1. 使用 yt-dlp 下载视频并提取音频
-      // -f best: 选择最佳画质
-      // --extract-audio: 提取音频
-      // --audio-format wav: 转为 wav
-      // --audio-quality 0: 最高质量
-      const cmd = [
-        'yt-dlp',
-        '-f', 'best',
-        '--extract-audio',
-        '--audio-format', 'wav',
-        '--audio-quality', '0',
-        '-o', outputPath.replace('.wav', '.%(ext)s'),
-        '--no-playlist',
-        '--no-check-certificate',
-        videoUrl
-      ].join(' ')
+      // 1. 使用 yt-dlp 下载并提取音频为 wav
+      const tempOutput = path.join(tempDir, `temp_${timestamp}`)
 
+      // 简化命令，不指定格式选择
+      const cmd = `yt-dlp --extract-audio --audio-format wav --audio-quality 0 -o "${tempOutput}.%(ext)s" --no-playlist --no-check-certificate "${videoUrl}"`
+      
       console.log(`[Audio] 执行命令: ${cmd}`)
-      execSync(cmd, { stdio: 'pipe' })
+      execSync(cmd, { stdio: 'pipe', shell: '/bin/bash' })
 
-      // yt-dlp 实际输出路径可能不是我们指定的
-      const actualPath = outputPath.replace('.wav', '.wav')
-      if (!fs.existsSync(actualPath.replace('.wav', '.wav'))) {
-        // 查找实际生成的文件
-        const files = fs.readdirSync(this.tempDir)
-        const audioFile = files.find(f => f.startsWith('audio_') && f.endsWith('.wav'))
-        if (audioFile) {
-          return path.join(this.tempDir, audioFile)
-        }
-      }
-
-      // 2. 如果 yt-dlp 输出不是 wav，转换一下
-      if (!outputPath.endsWith('.wav')) {
-        const wavPath = outputPath.replace(/\.\w+$/, '.wav')
-        await this.convertToWav(outputPath, wavPath)
+      // 查找生成的 wav 文件
+      const files = fs.readdirSync(tempDir)
+      const generatedFile = files.find(f => f.startsWith(`temp_${timestamp}`) && f.endsWith('.wav'))
+      
+      if (generatedFile) {
+        const wavPath = path.join(tempDir, `audio_${timestamp}.wav`)
+        // 重命名为标准格式
+        fs.renameSync(path.join(tempDir, generatedFile), wavPath)
+        console.log(`[Audio] 音频已提取: ${wavPath}`)
         return wavPath
       }
 
-      return outputPath
+      throw new Error('未找到生成的音频文件')
     } catch (error) {
       console.error(`[Audio] 提取音频失败:`, error)
       
-      // 尝试备用方案：直接下载然后转换
-      return await this.fallbackExtract(videoUrl)
+      // 尝试备用方案：使用 ffmpeg 直接处理
+      const outputPath = path.join(tempDir, `audio_${timestamp}.wav`)
+      return await this.fallbackExtract(videoUrl, outputPath)
     }
   }
 
   /**
    * 备用方案：使用 ffmpeg 直接处理
    */
-  private async fallbackExtract(videoUrl: string): Promise<string> {
-    const outputPath = path.join(this.tempDir, `audio_${Date.now()}.wav`)
-    
+  private async fallbackExtract(videoUrl: string, outputPath: string): Promise<string> {
     try {
       // 使用 ffmpeg 直接从 URL 提取音频
       const cmd = `ffmpeg -i "${videoUrl}" -vn -acodec pcm_s16le -ar 16000 -ac 1 -y "${outputPath}"`
-      execSync(cmd, { stdio: 'pipe' })
+      console.log(`[Audio] ffmpeg 备用方案: ${cmd}`)
+      execSync(cmd, { stdio: 'pipe', shell: '/bin/bash' })
       return outputPath
     } catch (error) {
       console.error(`[Audio] ffmpeg 备用方案也失败:`, error)
