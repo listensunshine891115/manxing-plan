@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import Taro from '@tarojs/taro'
-import { View, Text } from '@tarojs/components'
+import { View, Text, ScrollView } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import { 
   Sparkles, MapPin, Calendar, Check, User, Settings, Link2,
   X, ChevronRight, Trash2, Plus, Heart
@@ -33,6 +34,7 @@ interface InspirationPoint {
 export default function Index() {
   const [inspirations, setInspirations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   
   // 用户状态
   const [userInfo, setUserInfo] = useState<any>(null)
@@ -87,6 +89,14 @@ export default function Index() {
   useEffect(() => {
     fetchInspirations()
   }, [])
+
+  // 下拉刷新
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await fetchInspirations()
+    setRefreshing(false)
+    Taro.showToast({ title: '刷新成功', icon: 'success' })
+  }
 
   // 微信登录
   const handleLogin = async () => {
@@ -320,7 +330,13 @@ export default function Index() {
 
   // 已登录状态
   return (
-    <View className="min-h-screen bg-gray-50 pb-24">
+    <ScrollView
+      className="min-h-screen bg-gray-50 pb-24"
+      scrollY
+      refresherEnabled
+      refresherTriggered={refreshing}
+      onRefresherRefresh={onRefresh}
+    >
       {/* 顶部状态栏 */}
       <View className="bg-white border-b border-gray-100 px-4 py-3">
         <View className="flex items-center justify-between">
@@ -418,7 +434,27 @@ export default function Index() {
         </View>
       </View>
 
+      {/* 骨架屏加载状态 */}
+      {loading && (
+        <View className="px-4 py-4 space-y-3">
+          {[1, 2, 3, 4].map(i => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <View className="flex items-center">
+                  <Skeleton className="w-12 h-12 rounded-xl mr-4" />
+                  <View className="flex-1">
+                    <Skeleton className="h-4 w-24 mb-2" />
+                    <Skeleton className="h-3 w-16" />
+                  </View>
+                </View>
+              </CardContent>
+            </Card>
+          ))}
+        </View>
+      )}
+
       {/* 分类卡片 */}
+      {!loading && (
       <View className="px-4 py-4 space-y-3">
         {categoryStats.map(stat => (
           <Card 
@@ -450,17 +486,25 @@ export default function Index() {
           </Card>
         ))}
       </View>
+      )}
 
       {/* 空状态 */}
       {inspirations.length === 0 && !loading && (
-        <View className="flex flex-col items-center justify-center py-16">
-          <View className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <Sparkles size={32} color="#9ca3af" />
+        <View className="flex flex-col items-center justify-center py-20 px-8">
+          <View className="w-20 h-20 bg-gradient-to-br from-blue-50 to-green-50 rounded-full flex items-center justify-center mb-4 border border-blue-100">
+            <Sparkles size={40} color="#3b82f6" />
           </View>
-          <Text className="block text-base font-medium text-gray-900 mb-2">暂无灵感</Text>
-          <Text className="block text-sm text-gray-400 text-center px-8">
-            上方粘贴链接即可收录灵感{'\n'}短视频、票务平台、公众号文章
+          <Text className="block text-lg font-semibold text-gray-900 mb-2">开始你的灵感收集</Text>
+          <Text className="block text-sm text-gray-500 text-center mb-6">
+            上方粘贴链接即可收录灵感{'\n'}支持短视频、票务平台、公众号文章
           </Text>
+          <Button 
+            className="bg-gradient-to-r from-green-500 to-emerald-500"
+            onClick={() => Taro.pageScrollTo({ scrollTop: 0, duration: 300 })}
+          >
+            <Plus size={16} color="#fff" />
+            <Text className="text-white ml-2">去收录灵感</Text>
+          </Button>
         </View>
       )}
 
@@ -700,6 +744,6 @@ export default function Index() {
           </View>
         </View>
       )}
-    </View>
+    </ScrollView>
   )
 }

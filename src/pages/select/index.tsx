@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import Taro from '@tarojs/taro'
-import { View, Text } from '@tarojs/components'
+import { View, Text, ScrollView } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Network } from '@/network'
 import { InspirationCard, InspirationItem } from '@/components/inspiration-card'
@@ -32,6 +34,7 @@ const SelectPage = () => {
   const [allInspirations, setAllInspirations] = useState<InspirationItem[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   
   // 筛选状态 - 省市两级
   const [selectedProvince, setSelectedProvince] = useState<string>('')
@@ -49,6 +52,14 @@ const SelectPage = () => {
   useEffect(() => {
     fetchAllInspirations()
   }, [])
+
+  // 下拉刷新
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await fetchAllInspirations()
+    setRefreshing(false)
+    Taro.showToast({ title: '刷新成功', icon: 'success' })
+  }
 
   const fetchAllInspirations = async () => {
     setLoading(true)
@@ -438,63 +449,102 @@ const SelectPage = () => {
         </View>
       </View>
 
-      {/* 列表 */}
-      {loading ? (
-        <View className="flex justify-center py-20">
-          <Text className="block text-gray-400">加载中...</Text>
-        </View>
-      ) : filteredInspirations.length === 0 ? (
-        <View className="flex flex-col items-center justify-center py-20 px-4">
-          <View className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-            <Sparkles size={40} color="#9ca3af" />
+      {/* 下拉刷新容器 */}
+      <ScrollView
+        className="flex-1"
+        scrollY
+        refresherEnabled
+        refresherTriggered={refreshing}
+        onRefresherRefresh={onRefresh}
+      >
+        {/* 骨架屏加载状态 */}
+        {loading && (
+          <View className="p-4 space-y-3">
+            {[1, 2, 3, 4, 5].map(i => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <View className="flex items-start">
+                    <Skeleton className="w-10 h-10 rounded-lg mr-3" />
+                    <View className="flex-1">
+                      <Skeleton className="h-4 w-32 mb-2" />
+                      <Skeleton className="h-3 w-24 mb-2" />
+                      <Skeleton className="h-3 w-40" />
+                    </View>
+                  </View>
+                </CardContent>
+              </Card>
+            ))}
           </View>
-          <Text className="block text-gray-600 text-center mb-2">
-            {hasFilters ? '筛选条件下没有匹配的灵感点' : '还没有灵感点'}
-          </Text>
-          <Text className="block text-gray-400 text-sm text-center mb-4">
-            {hasFilters ? '试试调整筛选条件' : '去首页粘贴链接收录灵感'}
-          </Text>
-          {hasFilters && (
-            <Button onClick={resetFilters}>
-              <Text className="block">重置筛选</Text>
-            </Button>
-          )}
-        </View>
-      ) : (
-        <View className="p-4 space-y-3">
-          {/* 全选/取消全选 */}
-          <View className="flex items-center justify-between mb-2">
-            <Text className="text-sm text-gray-500">
-              {getFilterDescription()} · {filteredInspirations.length} 个灵感点
+        )}
+
+        {/* 空状态 */}
+        {!loading && filteredInspirations.length === 0 && (
+          <View className="flex flex-col items-center justify-center py-20 px-4">
+            <View className="w-20 h-20 bg-gradient-to-br from-blue-50 to-green-50 rounded-full flex items-center justify-center mb-4 border border-blue-100">
+              <Sparkles size={40} color="#3b82f6" />
+            </View>
+            <Text className="block text-lg font-semibold text-gray-900 mb-2">
+              {hasFilters ? '没有匹配的灵感点' : '还没有灵感点'}
             </Text>
-            <Text 
-              className="text-sm text-blue-500"
-              onClick={() => {
-                const allSelected = filteredInspirations.every(i => selectedIds.has(i.id))
-                if (allSelected) {
-                  deselectAll()
-                } else {
-                  selectAll()
-                }
-              }}
+            <Text className="block text-sm text-gray-500 text-center mb-6">
+              {hasFilters ? '试试调整筛选条件，或增加灵感点收录' : '去首页粘贴链接收录灵感'}
+            </Text>
+            <Button 
+              className="bg-gradient-to-r from-blue-500 to-blue-600"
+              onClick={hasFilters ? resetFilters : () => Taro.navigateBack()}
             >
-              {filteredInspirations.every(i => selectedIds.has(i.id)) ? '取消全选' : '全选'}
-            </Text>
+              {hasFilters ? (
+                <>
+                  <RotateCcw size={16} color="#fff" />
+                  <Text className="text-white ml-2">重置筛选</Text>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} color="#fff" />
+                  <Text className="text-white ml-2">去收录灵感</Text>
+                </>
+              )}
+            </Button>
           </View>
-          
-          {filteredInspirations.map((item) => (
-            <InspirationCard
-              key={item.id}
-              item={item}
-              showSelect
-              selected={selectedIds.has(item.id)}
-              onSelect={handleSelect}
-              onFavorite={handleFavorite}
-              onDelete={handleDelete}
-            />
-          ))}
-        </View>
-      )}
+        )}
+
+        {/* 灵感点列表 */}
+        {!loading && filteredInspirations.length > 0 && (
+          <View className="p-4 space-y-3">
+            {/* 全选/取消全选 */}
+            <View className="flex items-center justify-between mb-2">
+              <Text className="text-sm text-gray-500">
+                {getFilterDescription()} · {filteredInspirations.length} 个灵感点
+              </Text>
+              <Text 
+                className="text-sm text-blue-500"
+                onClick={() => {
+                  const allSelected = filteredInspirations.every(i => selectedIds.has(i.id))
+                  if (allSelected) {
+                    deselectAll()
+                  } else {
+                    selectAll()
+                  }
+                }}
+              >
+                {filteredInspirations.every(i => selectedIds.has(i.id)) ? '取消全选' : '全选'}
+              </Text>
+            </View>
+            
+            {filteredInspirations.map((item) => (
+              <InspirationCard
+                key={item.id}
+                item={item}
+                showSelect
+                selected={selectedIds.has(item.id)}
+                onSelect={handleSelect}
+                onFavorite={handleFavorite}
+                onDelete={handleDelete}
+              />
+            ))}
+          </View>
+        )}
+      </ScrollView>
 
       {/* 底部规划按钮 */}
       {allInspirations.length > 0 && (

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
-import { View, Text } from '@tarojs/components'
+import { View, Text, ScrollView } from '@tarojs/components'
 import { Input } from '@/components/ui/input'
 import Taro, { useRouter } from '@tarojs/taro'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Card, CardContent } from '@/components/ui/card'
 import { Network } from '@/network'
 import { InspirationCard, InspirationItem } from '@/components/inspiration-card'
 import { Plus, ArrowLeft, Sparkles } from 'lucide-react-taro'
@@ -13,6 +15,7 @@ const CategoryPage = () => {
   const router = useRouter()
   const [inspirations, setInspirations] = useState<InspirationItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [linkInput, setLinkInput] = useState('')
   const [adding, setAdding] = useState(false)
@@ -23,6 +26,14 @@ const CategoryPage = () => {
   useEffect(() => {
     fetchCategoryInspirations()
   }, [primaryTag])
+
+  // 下拉刷新
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await fetchCategoryInspirations()
+    setRefreshing(false)
+    Taro.showToast({ title: '刷新成功', icon: 'success' })
+  }
 
   const fetchCategoryInspirations = async () => {
     setLoading(true)
@@ -178,45 +189,76 @@ const CategoryPage = () => {
         </Badge>
       </View>
 
-      {/* 二级分类筛选 */}
-      {loading ? (
-        <View className="flex justify-center py-20">
-          <Text className="block text-gray-400">加载中...</Text>
-        </View>
-      ) : inspirations.length === 0 ? (
-        <View className="flex flex-col items-center justify-center py-20 px-4">
-          <View className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-            <Sparkles size={40} color="#9ca3af" />
+      {/* 下拉刷新容器 */}
+      <ScrollView
+        className="flex-1"
+        scrollY
+        refresherEnabled
+        refresherTriggered={refreshing}
+        onRefresherRefresh={onRefresh}
+      >
+        {/* 骨架屏加载状态 */}
+        {loading && (
+          <View className="p-4 space-y-3">
+            {[1, 2, 3, 4, 5].map(i => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <View className="flex items-start">
+                    <Skeleton className="w-10 h-10 rounded-lg mr-3" />
+                    <View className="flex-1">
+                      <Skeleton className="h-4 w-32 mb-2" />
+                      <Skeleton className="h-3 w-24 mb-2" />
+                      <Skeleton className="h-3 w-40" />
+                    </View>
+                  </View>
+                </CardContent>
+              </Card>
+            ))}
           </View>
-          <Text className="block text-gray-600 text-center mb-2">
-            还没有{primaryTag}灵感点
-          </Text>
-          <Text className="block text-gray-400 text-sm text-center mb-6">
-            点击下方按钮收录灵感
-          </Text>
-          <Button onClick={() => setShowAddDialog(true)}>
-            <Plus size={18} color="#FFFFFF" className="mr-1" />
-            <Text className="block">收录灵感</Text>
-          </Button>
-        </View>
-      ) : (
-        <View className="p-4 space-y-3">
-          {inspirations.map((item) => (
-            <InspirationCard
-              key={item.id}
-              item={item}
-              onDelete={handleDelete}
-              onFavorite={handleFavorite}
-              onClick={() => {
-                if (item.original_url) {
-                  Taro.setClipboardData({ data: item.original_url })
-                  Taro.showToast({ title: '链接已复制', icon: 'success' })
-                }
-              }}
-            />
-          ))}
-        </View>
-      )}
+        )}
+
+        {/* 空状态 */}
+        {!loading && inspirations.length === 0 && (
+          <View className="flex flex-col items-center justify-center py-20 px-4">
+            <View className="w-20 h-20 bg-gradient-to-br from-blue-50 to-green-50 rounded-full flex items-center justify-center mb-4 border border-blue-100">
+              <Sparkles size={40} color="#3b82f6" />
+            </View>
+            <Text className="block text-lg font-semibold text-gray-900 mb-2">
+              还没有{primaryTag}灵感点
+            </Text>
+            <Text className="block text-sm text-gray-500 text-center mb-6">
+              收录你感兴趣的{primaryTag}，方便规划路线
+            </Text>
+            <Button 
+              className="bg-gradient-to-r from-blue-500 to-blue-600"
+              onClick={() => setShowAddDialog(true)}
+            >
+              <Plus size={16} color="#fff" />
+              <Text className="text-white ml-2">收录灵感</Text>
+            </Button>
+          </View>
+        )}
+
+        {/* 灵感点列表 */}
+        {!loading && inspirations.length > 0 && (
+          <View className="p-4 space-y-3">
+            {inspirations.map((item) => (
+              <InspirationCard
+                key={item.id}
+                item={item}
+                onDelete={handleDelete}
+                onFavorite={handleFavorite}
+                onClick={() => {
+                  if (item.original_url) {
+                    Taro.setClipboardData({ data: item.original_url })
+                    Taro.showToast({ title: '链接已复制', icon: 'success' })
+                  }
+                }}
+              />
+            ))}
+          </View>
+        )}
+      </ScrollView>
 
       {/* 底部添加按钮 */}
       {inspirations.length > 0 && (

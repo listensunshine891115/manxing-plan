@@ -1,20 +1,31 @@
 import { useState, useEffect } from 'react'
 import Taro from '@tarojs/taro'
-import { View, Text } from '@tarojs/components'
+import { View, Text, ScrollView } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Card, CardContent } from '@/components/ui/card'
 import { Network } from '@/network'
 import { InspirationCard, InspirationItem } from '@/components/inspiration-card'
-import { ArrowLeft, Heart } from 'lucide-react-taro'
+import { ArrowLeft, Heart, Sparkles } from 'lucide-react-taro'
 import './index.config'
 
 const FavoritesPage = () => {
   const [favorites, setFavorites] = useState<InspirationItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     fetchFavorites()
   }, [])
+
+  // 下拉刷新
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await fetchFavorites()
+    setRefreshing(false)
+    Taro.showToast({ title: '刷新成功', icon: 'success' })
+  }
 
   const fetchFavorites = async () => {
     setLoading(true)
@@ -93,45 +104,76 @@ const FavoritesPage = () => {
         </Badge>
       </View>
 
-      {/* 收藏列表 */}
-      {loading ? (
-        <View className="flex justify-center py-20">
-          <Text className="block text-gray-400">加载中...</Text>
-        </View>
-      ) : favorites.length === 0 ? (
-        <View className="flex flex-col items-center justify-center py-20 px-4">
-          <View className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center mb-4">
-            <Heart size={40} color="#ef4444" />
+      {/* 下拉刷新容器 */}
+      <ScrollView
+        className="flex-1"
+        scrollY
+        refresherEnabled
+        refresherTriggered={refreshing}
+        onRefresherRefresh={onRefresh}
+      >
+        {/* 骨架屏加载状态 */}
+        {loading && (
+          <View className="p-4 space-y-3">
+            {[1, 2, 3, 4, 5].map(i => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <View className="flex items-start">
+                    <Skeleton className="w-10 h-10 rounded-lg mr-3" />
+                    <View className="flex-1">
+                      <Skeleton className="h-4 w-32 mb-2" />
+                      <Skeleton className="h-3 w-24 mb-2" />
+                      <Skeleton className="h-3 w-40" />
+                    </View>
+                  </View>
+                </CardContent>
+              </Card>
+            ))}
           </View>
-          <Text className="block text-gray-600 text-center mb-2">
-            还没有收藏的灵感点
-          </Text>
-          <Text className="block text-gray-400 text-sm text-center mb-6">
-            点击灵感点上的{'\n'}收藏按钮即可收藏
-          </Text>
-          <Button onClick={() => Taro.navigateBack()}>
-            <Text className="block">去收集灵感</Text>
-          </Button>
-        </View>
-      ) : (
-        <View className="p-4 space-y-3">
-          {favorites.map((inspiration) => (
-            <InspirationCard
-              key={inspiration.id}
-              item={inspiration}
-              onFavorite={handleFavorite}
-              onDelete={handleDelete}
-              onClick={(ins) => {
-                // 可以跳转到详情页
-                if (ins.original_url) {
-                  Taro.setClipboardData({ data: ins.original_url })
-                  Taro.showToast({ title: '链接已复制', icon: 'success' })
-                }
-              }}
-            />
-          ))}
-        </View>
-      )}
+        )}
+
+        {/* 空状态 */}
+        {!loading && favorites.length === 0 && (
+          <View className="flex flex-col items-center justify-center py-20 px-4">
+            <View className="w-20 h-20 bg-gradient-to-br from-red-50 to-pink-50 rounded-full flex items-center justify-center mb-4 border border-red-100">
+              <Heart size={40} color="#ef4444" />
+            </View>
+            <Text className="block text-lg font-semibold text-gray-900 mb-2">
+              还没有收藏的灵感点
+            </Text>
+            <Text className="block text-sm text-gray-500 text-center mb-6">
+              收藏你喜欢的灵感点，方便下次快速找到
+            </Text>
+            <Button 
+              className="bg-gradient-to-r from-red-500 to-pink-500"
+              onClick={() => Taro.navigateBack()}
+            >
+              <Sparkles size={16} color="#fff" />
+              <Text className="text-white ml-2">去收集灵感</Text>
+            </Button>
+          </View>
+        )}
+
+        {/* 收藏列表 */}
+        {!loading && favorites.length > 0 && (
+          <View className="p-4 space-y-3">
+            {favorites.map((inspiration) => (
+              <InspirationCard
+                key={inspiration.id}
+                item={inspiration}
+                onFavorite={handleFavorite}
+                onDelete={handleDelete}
+                onClick={(ins) => {
+                  if (ins.original_url) {
+                    Taro.setClipboardData({ data: ins.original_url })
+                    Taro.showToast({ title: '链接已复制', icon: 'success' })
+                  }
+                }}
+              />
+            ))}
+          </View>
+        )}
+      </ScrollView>
     </View>
   )
 }
