@@ -7,6 +7,7 @@ export default defineAppConfig({
     'pages/bind-guide/index',
     'pages/settings/index',
     'pages/generate/index',
+    'pages/confirm/index',
     'pages/route/index',
     'pages/vote/index',
     'pages/vote-result/index',

@@ -256,7 +256,7 @@ export default function Generate() {
         }
 
         await Taro.setStorage({ key: 'routePlanResult', data: result })
-        Taro.navigateTo({ url: '/pages/route/index' })
+        Taro.navigateTo({ url: '/pages/confirm/index' })
       } else {
         throw new Error(res.data?.msg || '路线规划失败')
       }
