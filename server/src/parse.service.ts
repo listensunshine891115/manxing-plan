@@ -77,7 +77,7 @@ export class ParseService {
       let sourceType: SourceType
       let content: string
       let url: string
-      let title: string = ''
+      let title: string
       let coverImage: string
 
       // 从输入中提取 URL
@@ -114,88 +114,14 @@ export class ParseService {
             } else {
               // 降级2：用 fetch 获取页面内容（可能失败）
               const fetchResult = await this.fetchUrl(url)
-              if (fetchResult.success) {
-                content = fetchResult.content || ''
-                title = fetchResult.title || '未命名'
-                coverImage = fetchResult.coverImage || ''
-              } else {
-                // 降级3：从输入文字中提取内容
-                const textContent = this.extractTextFromInput(input.url || input.text || '')
-                if (textContent) {
-                  console.log(`[Parse] 视频获取失败，降级使用输入文字: ${textContent.substring(0, 50)}...`)
-                  content = textContent
-                  title = ''
-                } else {
-                  // 降级4：直接返回原始文字内容
-                  return {
-                    success: true,
-                    data: {
-                      name: this.extractTextFromInput(input.url || input.text || ''),
-                      source: '社交短视频平台',
-                      type: '视频',
-                      location_name: '',
-                      time: '',
-                      price: '',
-                      description: input.url || input.text || '',
-                      tags: [],
-                      original_url: url,
-                    },
-                    message: '已收录，但未能获取详细信息'
-                  }
-                }
-              }
-            }
-          }
-        } else if (sourceType === 'article') {
-          // 社交图文平台（小红书等）：先解析短链接，再尝试 fetchUrl
-          const realUrl = await this.resolveShortUrl(url)
-          if (realUrl && realUrl !== url) {
-            console.log(`[Parse] 短链接已解析: ${url} -> ${realUrl}`)
-            url = realUrl
-          }
-
-          // 获取图文内容和图片
-          const fetchResult = await this.fetchUrl(url)
-          content = fetchResult.content || ''
-          title = fetchResult.title || ''
-          coverImage = fetchResult.coverImage || ''
-
-          // 对于图文类型，无论是否有文本内容，都尝试 OCR 所有图片
-          if (fetchResult.imageUrls && fetchResult.imageUrls.length > 0) {
-            console.log(`[Parse] 图文类型，获取到 ${fetchResult.imageUrls.length} 张图片，尝试 OCR...`)
-            const ocrText = await this.extractTextFromImages(fetchResult.imageUrls)
-            if (ocrText) {
-              console.log(`[Parse] OCR 成功提取 ${ocrText.length} 字符`)
-              // 合并文本内容（如果有的话）
-              if (content) {
-                content = `${content}\n\n=== 以下是从图片中提取的文字 ===\n${ocrText}`
-              } else {
-                content = ocrText
-              }
-            }
-          }
-
-          // 如果仍然没有内容，降级处理
-          if (!content) {
-            console.log(`[Parse] 图文获取失败，尝试视频提取...`)
-            const videoContent = await this.tryVideoExtraction(url, input)
-            if (videoContent) {
-              content = videoContent
-              title = title || ''
-            } else {
-              // 降级：使用输入文字
-              const textContent = this.extractTextFromInput(input.url || input.text || '')
-              if (textContent) {
-                content = textContent
-                title = title || ''
-              } else {
-                // 降级：直接返回原始文字内容
+              if (!fetchResult.success) {
+                // 降级3：直接返回原始文字内容
                 return {
                   success: true,
                   data: {
                     name: this.extractTextFromInput(input.url || input.text || ''),
-                    source: '社交平台',
-                    type: '图文',
+                    source: '社交短视频平台',
+                    type: '视频',
                     location_name: '',
                     time: '',
                     price: '',
@@ -206,6 +132,9 @@ export class ParseService {
                   message: '已收录，但未能获取详细信息'
                 }
               }
+              content = fetchResult.content || ''
+              title = fetchResult.title || '未命名'
+              coverImage = fetchResult.coverImage || ''
             }
           }
         } else {
@@ -268,36 +197,6 @@ export class ParseService {
     }
   }
 
-  // 尝试视频提取（辅助方法）
-  private async tryVideoExtraction(url: string, input: { url?: string; text?: string }): Promise<string | null> {
-    try {
-      console.log(`[Parse] 尝试视频提取...`)
-      const subtitleResult = await this.extractVideoSubtitle(url)
-      if (subtitleResult) {
-        return subtitleResult
-      }
-      
-      // 降级1：尝试 yt-dlp
-      const ytDlpResult = await this.getVideoInfoWithYtDlp(url)
-      if (ytDlpResult.success) {
-        return ytDlpResult.description || ytDlpResult.title || ''
-      }
-      
-      // 降级2：从输入文字中提取内容
-      const textContent = this.extractTextFromInput(input.url || input.text || '')
-      if (textContent) {
-        console.log(`[Parse] 视频提取失败，降级使用输入文字`)
-        return textContent
-      }
-      
-      return null
-    } catch (e: any) {
-      console.log(`[Parse] 视频提取异常: ${e.message}`)
-      // 最后降级：使用输入文字
-      return this.extractTextFromInput(input.url || input.text || '')
-    }
-  }
-
   // 预览多个灵感点
   async previewMultiple(
     userId: string,
@@ -320,14 +219,12 @@ export class ParseService {
       let sourceUrl = input.url || ''
       let sourceType: SourceType = 'article'
 
-      // 提取 URL（优先从 url 字段提取，其次从 text 字段提取）
-      const textWithUrl = input.url || input.text || ''
-      if (textWithUrl) {
-        const extractedUrl = this.extractUrl(textWithUrl)
+      // 提取 URL
+      if (input.url) {
+        const extractedUrl = this.extractUrl(input.url || '')
         if (extractedUrl) {
           sourceUrl = extractedUrl
           sourceType = this.detectSourceType(sourceUrl)
-          console.log(`[Parse] 检测到 URL: ${sourceUrl}, 类型: ${sourceType}`)
         } else {
           sourceUrl = ''
         }
@@ -368,70 +265,6 @@ export class ParseService {
                 }
               } else {
                 return { success: false, message: '无法获取视频内容' }
-              }
-            }
-          }
-        } else if (sourceType === 'article') {
-          // 社交图文平台（小红书等）：先解析短链接，再尝试 fetchUrl
-          const realUrl = await this.resolveShortUrl(sourceUrl)
-          if (realUrl && realUrl !== sourceUrl) {
-            console.log(`[Parse] previewMultiple 短链接已解析: ${sourceUrl} -> ${realUrl}`)
-            sourceUrl = realUrl
-          }
-
-          // 获取图文内容和图片
-          const fetchResult = await this.fetchUrl(sourceUrl)
-          console.log(`[Parse] previewMultiple fetchUrl 结果: success=${fetchResult.success}, content长度=${(fetchResult.content || '').length}, imageUrls数量=${(fetchResult.imageUrls || []).length}`)
-          content = fetchResult.content || ''
-          title = fetchResult.title || ''
-
-          // 对于图文类型，无论是否有文本内容，都尝试 OCR 所有图片
-          if (fetchResult.imageUrls && fetchResult.imageUrls.length > 0) {
-            console.log(`[Parse] previewMultiple 图文类型，获取到 ${fetchResult.imageUrls.length} 张图片，尝试 OCR...`)
-            const ocrText = await this.extractTextFromImages(fetchResult.imageUrls)
-            if (ocrText) {
-              console.log(`[Parse] OCR 成功提取 ${ocrText.length} 字符`)
-              // 合并文本内容（如果有的话）
-              if (content) {
-                content = `${content}\n\n=== 以下是从图片中提取的文字 ===\n${ocrText}`
-              } else {
-                content = ocrText
-              }
-            }
-          }
-
-          // 如果仍然没有内容，尝试降级处理
-          if (!content) {
-            // 对于小红书图文链接，不要尝试视频提取（图文链接没有视频）
-            // 直接使用输入文字分析，并在结果中提示
-            const isXiaoHongShuArticle = sourceUrl.includes('xiaohongshu.com') && !sourceUrl.includes('/video/')
-            if (isXiaoHongShuArticle) {
-              console.log(`[Parse] previewMultiple 小红书图文链接，获取内容失败，将使用输入文字分析`)
-            } else {
-              console.log(`[Parse] previewMultiple 图文获取失败，尝试视频提取...`)
-              const subtitleResult = await this.extractVideoSubtitle(sourceUrl)
-              if (subtitleResult) {
-                content = subtitleResult
-                title = ''
-              } else {
-                const ytDlpResult = await this.getVideoInfoWithYtDlp(sourceUrl)
-                if (ytDlpResult.success) {
-                  content = ytDlpResult.description || ytDlpResult.title || ''
-                  title = ytDlpResult.title || ''
-                }
-              }
-            }
-            
-            // 如果仍然没有内容，使用输入文字
-            if (!content && input.text) {
-              const textContent = this.extractTextFromInput(input.text)
-              if (textContent) {
-                console.log(`[Parse] previewMultiple 降级使用输入文字`)
-                content = textContent
-                title = ''
-                sourceType = 'text'
-              } else {
-                return { success: false, message: '无法获取内容' }
               }
             }
           }
@@ -734,7 +567,6 @@ export class ParseService {
     content?: string
     title?: string
     coverImage?: string
-    imageUrls?: string[]
     message?: string
   }> {
     try {
@@ -777,17 +609,11 @@ export class ParseService {
         coverImage = firstImage.image.display_url
       }
 
-      // 提取所有图片 URL（用于 OCR）
-      const imageUrls: string[] = response.content
-        .filter(item => item.type === 'image' && item.image?.display_url)
-        .map(item => item.image!.display_url as string)
-
       return {
         success: true,
         content: textContent,
         title: response.title || '',
-        coverImage,
-        imageUrls
+        coverImage
       }
     } catch (error: any) {
       console.error(`[Parse] Fetch 失败:`, error)
@@ -795,90 +621,27 @@ export class ParseService {
     }
   }
 
-  // 从图片提取文字（OCR）
-  private async extractTextFromImages(imageUrls: string[]): Promise<string> {
-    if (!imageUrls || imageUrls.length === 0) {
-      return ''
-    }
-
-    try {
-      console.log(`[Parse] 开始 OCR 提取图片文字，共 ${imageUrls.length} 张图片`)
-
-      const allTexts: string[] = []
-      const maxImages = 3 // 最多处理 3 张图片，避免超时
-
-      for (let i = 0; i < Math.min(imageUrls.length, maxImages); i++) {
-        const imageUrl = imageUrls[i]
-        console.log(`[Parse] OCR 处理第 ${i + 1} 张图片: ${imageUrl}`)
-
-        try {
-          // 下载图片到临时文件
-          const tempFile = `/tmp/ocr_image_${Date.now()}_${i}.jpg`
-          execSync(`curl -s -L "${imageUrl}" -o "${tempFile}" --max-time 15`, { stdio: 'pipe' })
-
-          // 检查文件是否存在且有效
-          const fileStat = execSync(`stat -c%s "${tempFile}" 2>/dev/null || echo 0`).toString().trim()
-          if (parseInt(fileStat) < 1000) {
-            console.log(`[Parse] 图片下载失败或文件过小，跳过`)
-            continue
-          }
-
-          // 使用 tesseract OCR 提取文字
-          const cmd = `tesseract "${tempFile}" stdout -l chi_sim+eng --oem 1 --psm 4 2>/dev/null | head -100`
-          const text = execSync(cmd, { stdio: 'pipe', shell: '/bin/bash', timeout: 30000 }).toString().trim()
-
-          if (text && text.length > 5) {
-            console.log(`[Parse] OCR 提取到 ${text.length} 字符`)
-            allTexts.push(text)
-          }
-
-          // 删除临时文件
-          execSync(`rm -f "${tempFile}"`, { stdio: 'pipe' })
-        } catch (e: any) {
-          console.log(`[Parse] OCR 处理图片失败: ${e.message}`)
-        }
-      }
-
-      if (allTexts.length > 0) {
-        console.log(`[Parse] OCR 共提取 ${allTexts.length} 张图片的文字`)
-        return allTexts.join('\n\n')
-      }
-
-      return ''
-    } catch (error: any) {
-      console.error(`[Parse] OCR 失败:`, error.message)
-      return ''
-    }
-  }
-
   // 检测来源类型
   private detectSourceType(url: string): SourceType {
     const lowerUrl = url.toLowerCase()
     
-    // 一类：纯短视频平台（抖音、B站、快手等 - 这些都是视频）
+    // 一类：社交短视频/图文平台（包括小红书）
     if (
+      lowerUrl.includes('douyin.com') ||
       lowerUrl.includes('v.douyin') ||
+      lowerUrl.includes('xiaohongshu.com') ||
+      lowerUrl.includes('xhslink.com') ||
       lowerUrl.includes('bilibili.com') ||
       lowerUrl.includes('b23.tv') ||
       lowerUrl.includes('kuaishou.com') ||
       lowerUrl.includes('ksurl.cn') ||
-      lowerUrl.includes('weishi.qq.com')
+      lowerUrl.includes('weishi.qq.com') ||
+      lowerUrl.includes('weibo.com')
     ) {
       return 'video'
     }
     
-    // 二类：社交图文/视频混合平台（微博、小红书）
-    // 这些平台既有视频也有图文，需要先解析短链接再判断
-    // 暂时返回 'article'，在后续流程中根据实际情况处理
-    if (
-      lowerUrl.includes('xiaohongshu.com') ||
-      lowerUrl.includes('xhslink.com') ||
-      lowerUrl.includes('weibo.com')
-    ) {
-      return 'article' // 图文优先，失败后再尝试视频
-    }
-    
-    // 三类：票务平台
+    // 二类：票务平台
     if (
       lowerUrl.includes('damai.cn') ||
       lowerUrl.includes('摩天轮') ||
@@ -888,7 +651,7 @@ export class ParseService {
       return 'ticket'
     }
     
-    // 四类：商户信息平台
+    // 三类：商户信息平台
     if (
       lowerUrl.includes('dianping.com') ||
       lowerUrl.includes('大众点评') ||
