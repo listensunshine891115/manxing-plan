@@ -99,18 +99,18 @@ export default function Confirm() {
         url: '/api/trip/trips',
         method: 'POST',
         data: {
-          name: `行程-${routePlan.settings.startDate}`,
-          content: {
+          version_name: `行程-${routePlan.settings.startDate}`,
+          content: [{
             itinerary: routePlan.itinerary,
             route: routePlan.route,
             statistics: routePlan.statistics
-          },
+          }],
           settings: {
+            start_date: routePlan.settings.startDate,
             days: routePlan.settings.days,
-            startDate: routePlan.settings.startDate,
             mainDestination: routePlan.settings.mainDestination
           },
-          userId
+          user_id: userId
         }
       })
 
