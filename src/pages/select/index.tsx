@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Taro from '@tarojs/taro'
 import { View, Text } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Network } from '@/network'
 import { InspirationCard, InspirationItem } from '@/components/inspiration-card'
-import { ArrowLeft, Sparkles, SlidersHorizontal } from 'lucide-react-taro'
+import { ArrowLeft, Sparkles, SlidersHorizontal, MapPin, RotateCcw } from 'lucide-react-taro'
 import { primaryTagConfig } from '../index/config'
 import './index.config'
 
@@ -20,13 +20,22 @@ interface CategoryStat {
   color: string
 }
 
+// 城市统计
+interface CityStat {
+  city: string
+  count: number
+}
+
 const SelectPage = () => {
   const [allInspirations, setAllInspirations] = useState<InspirationItem[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
-  const [activeCategory, setActiveCategory] = useState<string>('全部')
+  
+  // 筛选状态
+  const [selectedCity, setSelectedCity] = useState<string>('')
+  const [selectedCategory, setSelectedCategory] = useState<string>('全部')
 
-  // 分类统计
+  // 分类统计配置
   const categoryStats: CategoryStat[] = [
     { tag: '景点', ...primaryTagConfig['景点'], count: 0 },
     { tag: '美食', ...primaryTagConfig['美食'], count: 0 },
@@ -56,6 +65,32 @@ const SelectPage = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  // 从灵感点中提取城市列表
+  const cityStats: CityStat[] = useMemo(() => {
+    const cityMap = new Map<string, number>()
+    allInspirations.forEach(inspiration => {
+      // 从 location_name 中提取城市（通常是第一个逗号前的部分）
+      const location = inspiration.location_name || ''
+      // 简单处理：如果包含逗号，取第一部分作为城市
+      const city = location.includes(',') ? location.split(',')[0].trim() : location.trim()
+      if (city) {
+        cityMap.set(city, (cityMap.get(city) || 0) + 1)
+      }
+    })
+    return Array.from(cityMap.entries())
+      .map(([city, count]) => ({ city, count }))
+      .sort((a, b) => b.count - a.count)
+  }, [allInspirations])
+
+  // 判断是否有筛选条件
+  const hasFilters = selectedCity !== '' || selectedCategory !== '全部'
+
+  // 重置筛选条件
+  const resetFilters = () => {
+    setSelectedCity('')
+    setSelectedCategory('全部')
   }
 
   // 处理收藏/取消收藏
@@ -111,28 +146,20 @@ const SelectPage = () => {
     })
   }
 
-  // 全选当前分类
+  // 全选当前筛选结果
   const selectAll = () => {
-    const items = activeCategory === '全部' 
-      ? allInspirations 
-      : allInspirations.filter(i => i.primary_tag === activeCategory)
-    setSelectedIds(prev => {
-      const newSet = new Set(prev)
-      items.forEach(i => newSet.add(i.id))
-      return newSet
+    filteredInspirations.forEach(i => {
+      selectedIds.add(i.id)
     })
+    setSelectedIds(new Set(selectedIds))
   }
 
-  // 取消全选当前分类
+  // 取消全选当前筛选结果
   const deselectAll = () => {
-    const items = activeCategory === '全部' 
-      ? allInspirations 
-      : allInspirations.filter(i => i.primary_tag === activeCategory)
-    setSelectedIds(prev => {
-      const newSet = new Set(prev)
-      items.forEach(i => newSet.delete(i.id))
-      return newSet
+    filteredInspirations.forEach(i => {
+      selectedIds.delete(i.id)
     })
+    setSelectedIds(new Set(selectedIds))
   }
 
   // 开始规划
@@ -145,24 +172,53 @@ const SelectPage = () => {
     Taro.navigateTo({ url: `/pages/generate/index?selected=${selected}` })
   }
 
-  // 根据分类筛选
-  const filteredInspirations = activeCategory === '全部' 
-    ? allInspirations 
-    : allInspirations.filter(i => i.primary_tag === activeCategory)
+  // 根据城市+分类筛选
+  const filteredInspirations = useMemo(() => {
+    let result = allInspirations
+    
+    // 城市筛选
+    if (selectedCity) {
+      result = result.filter(i => {
+        const location = i.location_name || ''
+        return location.startsWith(selectedCity) || location.includes(`,${selectedCity}`)
+      })
+    }
+    
+    // 分类筛选
+    if (selectedCategory !== '全部') {
+      result = result.filter(i => i.primary_tag === selectedCategory)
+    }
+    
+    return result
+  }, [allInspirations, selectedCity, selectedCategory])
 
-  // 获取分类统计
+  // 获取分类统计（基于当前筛选后的城市）
   const getStats = () => {
+    let baseData = allInspirations
+    
+    // 如果选了城市，先按城市筛选
+    if (selectedCity) {
+      baseData = allInspirations.filter(i => {
+        const location = i.location_name || ''
+        return location.startsWith(selectedCity) || location.includes(`,${selectedCity}`)
+      })
+    }
+    
     return categoryStats.map(stat => ({
       ...stat,
-      count: allInspirations.filter(i => i.primary_tag === stat.tag).length
+      count: baseData.filter(i => i.primary_tag === stat.tag).length
     }))
   }
 
-  // 获取当前选中分类的标签
-  const getCurrentCategoryLabel = () => {
-    if (activeCategory === '全部') return '🏠 全部'
-    const stat = getStats().find(s => s.tag === activeCategory)
-    return stat ? `${stat.icon} ${stat.label}` : '🏠 全部'
+  // 获取当前筛选条件描述
+  const getFilterDescription = () => {
+    const parts: string[] = []
+    if (selectedCity) parts.push(selectedCity)
+    if (selectedCategory !== '全部') {
+      const stat = getStats().find(s => s.tag === selectedCategory)
+      if (stat) parts.push(stat.icon + stat.label)
+    }
+    return parts.length > 0 ? parts.join(' · ') : '全部'
   }
 
   return (
@@ -178,21 +234,62 @@ const SelectPage = () => {
         </Badge>
       </View>
 
-      {/* 分类筛选 */}
-      <View className="bg-white border-b border-gray-100 px-4 py-3">
-        <View className="flex items-center gap-3">
+      {/* 筛选区域 */}
+      <View className="bg-white border-b border-gray-100">
+        {/* 筛选标题行 */}
+        <View className="px-4 py-3 flex items-center justify-between border-b border-gray-50">
           <View className="flex items-center">
             <SlidersHorizontal size={16} color="#6b7280" />
-            <Text className="block text-sm text-gray-600 ml-2">筛选：</Text>
+            <Text className="block text-sm text-gray-600 ml-2">筛选条件</Text>
+          </View>
+          {hasFilters && (
+            <View 
+              className="flex items-center text-blue-500"
+              onClick={resetFilters}
+            >
+              <RotateCcw size={14} color="#3b82f6" />
+              <Text className="block text-sm text-blue-500 ml-1">重置</Text>
+            </View>
+          )}
+        </View>
+        
+        {/* 筛选下拉行 */}
+        <View className="px-4 py-3 flex items-center gap-4">
+          {/* 城市筛选 */}
+          <View className="flex-1">
+            <Text className="block text-xs text-gray-400 mb-1">
+              <MapPin size={12} color="#9ca3af" className="inline mr-1" />
+              城市
+            </Text>
+            <Select
+              value={selectedCity}
+              onValueChange={(value) => setSelectedCity(value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="不限城市" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">不限城市</SelectItem>
+                {cityStats.map(cs => (
+                  <SelectItem key={cs.city} value={cs.city}>
+                    {cs.city} ({cs.count})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </View>
           
+          {/* 分类筛选 */}
           <View className="flex-1">
+            <Text className="block text-xs text-gray-400 mb-1">
+              类别
+            </Text>
             <Select
-              value={activeCategory}
-              onValueChange={(value) => setActiveCategory(value)}
+              value={selectedCategory}
+              onValueChange={(value) => setSelectedCategory(value)}
             >
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="选择分类" />
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="全部分类" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="全部">🏠 全部</SelectItem>
@@ -203,21 +300,22 @@ const SelectPage = () => {
               </SelectContent>
             </Select>
           </View>
-          
-          <View className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">
-              全部 {allInspirations.length}
+        </View>
+        
+        {/* 筛选结果统计 */}
+        <View className="px-4 py-2 flex items-center gap-2 bg-gray-50 flex-wrap">
+          <Badge variant="outline" className="text-xs">
+            共 {filteredInspirations.length} 个
+          </Badge>
+          {getStats().filter(s => s.count > 0).map(stat => (
+            <Badge 
+              key={stat.tag}
+              className="text-xs"
+              style={{ backgroundColor: stat.bgColor, color: stat.color }}
+            >
+              {stat.icon} {stat.count}
             </Badge>
-            {getStats().filter(s => s.count > 0).map(stat => (
-              <Badge 
-                key={stat.tag}
-                className="text-xs"
-                style={{ backgroundColor: stat.bgColor, color: stat.color }}
-              >
-                {stat.icon} {stat.count}
-              </Badge>
-            ))}
-          </View>
+          ))}
         </View>
       </View>
 
@@ -232,18 +330,23 @@ const SelectPage = () => {
             <Sparkles size={40} color="#9ca3af" />
           </View>
           <Text className="block text-gray-600 text-center mb-2">
-            {activeCategory === '全部' ? '还没有灵感点' : `还没有${activeCategory}灵感点`}
+            {hasFilters ? '筛选条件下没有匹配的灵感点' : '还没有灵感点'}
           </Text>
-          <Text className="block text-gray-400 text-sm text-center">
-            去首页粘贴链接收录灵感
+          <Text className="block text-gray-400 text-sm text-center mb-4">
+            {hasFilters ? '试试调整筛选条件' : '去首页粘贴链接收录灵感'}
           </Text>
+          {hasFilters && (
+            <Button onClick={resetFilters}>
+              <Text className="block">重置筛选</Text>
+            </Button>
+          )}
         </View>
       ) : (
         <View className="p-4 space-y-3">
           {/* 全选/取消全选 */}
           <View className="flex items-center justify-between mb-2">
             <Text className="text-sm text-gray-500">
-              {getCurrentCategoryLabel()} · {filteredInspirations.length} 个灵感点
+              {getFilterDescription()} · {filteredInspirations.length} 个灵感点
             </Text>
             <Text 
               className="text-sm text-blue-500"
