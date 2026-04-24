@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Taro from '@tarojs/taro'
 import { View, Text } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,11 +28,26 @@ export default function Index() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
-  // 模拟当前用户（实际应从登录态获取）
-  const userId = 'user_' + Date.now()
+  // 获取用户信息
+  const fetchUserInfo = async () => {
+    try {
+      const res = await Taro.getStorage({ key: 'userInfo' })
+      if (res.data) {
+        return res.data
+      }
+    } catch {
+      // 未登录
+    }
+    return null
+  }
 
   // 加载灵感列表
   const fetchInspirations = async () => {
+    const user = await fetchUserInfo()
+    
+    // 如果没有用户ID，生成临时ID（模拟）
+    const userId = user?.id || 'guest_' + Date.now()
+
     try {
       const res = await Network.request({
         url: '/api/trip/inspirations',
