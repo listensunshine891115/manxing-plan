@@ -4,7 +4,7 @@ import Taro from '@tarojs/taro'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Network } from '@/network'
-import { MapPin, Utensils, Plus, Route } from 'lucide-react-taro'
+import { MapPin, Utensils, Link2, Route } from 'lucide-react-taro'
 import './index.config'
 
 interface CategoryCount {
@@ -57,7 +57,7 @@ export default function Index() {
 
   const handleCategoryClick = (tag: string) => {
     Taro.navigateTo({
-      url: `/pages/category/index?tag=${encodeURIComponent(tag)}`
+      url: `/pages/select/index?tag=${encodeURIComponent(tag)}`
     })
   }
 
@@ -66,15 +66,29 @@ export default function Index() {
       {/* 顶部标题 */}
       <View className="bg-white px-4 pt-12 pb-4">
         <Text className="block text-2xl font-bold text-gray-900">
-          我的灵感库
+          此刻与你漫行
         </Text>
         <Text className="block text-sm text-gray-500 mt-1">
-          收藏旅行灵感，规划完美路线
+          粘贴链接，提取旅行灵感
         </Text>
       </View>
 
+      {/* 核心功能入口 */}
+      <View className="p-4">
+        <Button 
+          onClick={() => Taro.navigateTo({ url: '/pages/select/index' })}
+          className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-4 rounded-xl shadow-lg"
+        >
+          <Link2 size={24} color="#FFFFFF" className="mr-3" />
+          <View>
+            <Text className="block text-lg font-semibold">粘贴链接提取灵感</Text>
+            <Text className="block text-sm text-blue-100 mt-1">小红书/大众点评/文字描述</Text>
+          </View>
+        </Button>
+      </View>
+
       {/* 分类卡片 */}
-      <View className="p-4 space-y-4">
+      <View className="px-4 space-y-4">
         {/* 景点 */}
         <Card 
           onClick={() => handleCategoryClick('景点')}
@@ -88,10 +102,10 @@ export default function Index() {
                 </View>
                 <View className="ml-4">
                   <Text className="block text-xl font-semibold text-white">
-                    景点
+                    景点灵感
                   </Text>
                   <Text className="block text-sm text-blue-100 mt-1">
-                    {getCount('景点')} 个灵感点
+                    {getCount('景点')} 个收录
                   </Text>
                 </View>
               </View>
@@ -112,10 +126,10 @@ export default function Index() {
                 </View>
                 <View className="ml-4">
                   <Text className="block text-xl font-semibold text-white">
-                    美食
+                    美食灵感
                   </Text>
                   <Text className="block text-sm text-orange-100 mt-1">
-                    {getCount('美食')} 个灵感点
+                    {getCount('美食')} 个收录
                   </Text>
                 </View>
               </View>
@@ -126,27 +140,14 @@ export default function Index() {
 
       {/* 底部固定按钮 */}
       <View className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 pb-6">
-        <View className="flex gap-3">
-          <View style={{ flex: 1 }}>
-            <Button 
-              onClick={() => Taro.navigateTo({ url: '/pages/category/index?tag=景点' })}
-              className="w-full bg-gray-900 hover:bg-gray-800 text-white"
-            >
-              <Plus size={18} color="#FFFFFF" className="mr-1" />
-              <Text className="block">收录灵感</Text>
-            </Button>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button 
-              onClick={() => Taro.navigateTo({ url: '/pages/select/index' })}
-              disabled={totalCount === 0}
-              className={`w-full ${totalCount > 0 ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300'} text-white`}
-            >
-              <Route size={18} color="#FFFFFF" className="mr-1" />
-              <Text className="block">规划路线</Text>
-            </Button>
-          </View>
-        </View>
+        <Button 
+          onClick={() => Taro.navigateTo({ url: '/pages/select/index' })}
+          disabled={totalCount === 0}
+          className={`w-full ${totalCount > 0 ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-300'} text-white`}
+        >
+          <Route size={18} color="#FFFFFF" className="mr-2" />
+          <Text className="block">从灵感库选择生成路线</Text>
+        </Button>
       </View>
     </View>
   )
