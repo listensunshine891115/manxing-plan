@@ -5,20 +5,11 @@ import { Calendar } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
-import { ArrowLeft, CalendarDays, Clock, Car, Bus, MapPin, Search, X, ChevronRight, Loader, Users, Wand } from 'lucide-react-taro'
-import { format } from 'date-fns'
+import { ArrowLeft, CalendarDays, CalendarRange, Car, Bus, MapPin, Search, X, ChevronRight, Loader, Users, Wand } from 'lucide-react-taro'
+import { format, differenceInDays, addDays } from 'date-fns'
 import { Network } from '@/network'
 import Taro from '@tarojs/taro'
 import './index.css'
-
-// 行程时段选项
-const timePeriodOptions = [
-  { value: 'half', label: '半天', days: 0.5 },
-  { value: 'one_day', label: '一天', days: 1 },
-  { value: 'two_three', label: '2-3天', days: 2.5 },
-  { value: 'three_five', label: '3-5天', days: 4 },
-  { value: 'week_plus', label: '5天以上', days: 7 }
-]
 
 // 集合地点搜索结果类型
 interface PlaceResult {
@@ -83,9 +74,13 @@ interface RoutePlanResult {
 export default function Generate() {
   // 出行设置
   const [startDate, setStartDate] = useState<Date>(new Date())
-  const [timePeriod, setTimePeriod] = useState('two_three')
+  const [endDate, setEndDate] = useState<Date>(addDays(new Date(), 3))
   const [transportMode, setTransportMode] = useState<'public' | 'self-drive'>('public')
-  const [showCalendar, setShowCalendar] = useState(false)
+  const [showStartCalendar, setShowStartCalendar] = useState(false)
+  const [showEndCalendar, setShowEndCalendar] = useState(false)
+
+  // 计算行程天数
+  const tripDays = differenceInDays(endDate, startDate) + 1
 
   // 邀请同伴
   const [inviteCompanion, setInviteCompanion] = useState(false)
@@ -195,12 +190,6 @@ export default function Generate() {
     setMeetingCoords(null)
   }
 
-  // 获取行程天数
-  const getDays = () => {
-    const option = timePeriodOptions.find(o => o.value === timePeriod)
-    return option?.days || 1
-  }
-
   // 生成路线
   const handleGenerate = async () => {
     if (selectedInspirations.length === 0) {
@@ -231,7 +220,7 @@ export default function Generate() {
         data: {
           inspirations: inspirationsData,
           mainDestination: meetingCoords ? `${meetingPoint}` : undefined,
-          days: Math.ceil(getDays()),
+          days: tripDays,
           startDate: format(startDate, 'yyyy-MM-dd'),
           meetingPoint: meetingCoords ? {
             name: meetingPoint,
@@ -268,27 +257,56 @@ export default function Generate() {
   }
 
   // 渲染日历
-  const renderCalendar = () => {
-    if (!showCalendar) return null
-    
-    return (
-      <View className="calendar-overlay" onClick={() => setShowCalendar(false)}>
-        <View className="calendar-container" onClick={e => e.stopPropagation()}>
-          <Calendar
-            mode="single"
-            selected={startDate}
-            onSelect={(date) => {
-              if (date) {
-                setStartDate(date)
-                setShowCalendar(false)
-              }
-            }}
-            disabled={(date) => date < new Date()}
-          />
+  const renderCalendars = () => (
+    <>
+      {/* 起始日期日历 */}
+      {showStartCalendar && (
+        <View className="calendar-overlay" onClick={() => setShowStartCalendar(false)}>
+          <View className="calendar-container" onClick={e => e.stopPropagation()}>
+            <Calendar
+              mode="single"
+              selected={startDate}
+              onSelect={(date) => {
+                if (date) {
+                  setStartDate(date)
+                  // 如果结束日期早于新的起始日期，自动调整
+                  if (date > endDate) {
+                    setEndDate(addDays(date, 3))
+                  }
+                  setShowStartCalendar(false)
+                }
+              }}
+              disabled={(date) => date < new Date()}
+            />
+          </View>
         </View>
-      </View>
-    )
-  }
+      )}
+
+      {/* 结束日期日历 */}
+      {showEndCalendar && (
+        <View className="calendar-overlay" onClick={() => setShowEndCalendar(false)}>
+          <View className="calendar-container" onClick={e => e.stopPropagation()}>
+            <Calendar
+              mode="single"
+              selected={endDate}
+              onSelect={(date) => {
+                if (date) {
+                  // 结束日期不能早于起始日期
+                  if (date >= startDate) {
+                    setEndDate(date)
+                  } else {
+                    Taro.showToast({ title: '结束日期不能早于起始日期', icon: 'none' })
+                  }
+                  setShowEndCalendar(false)
+                }
+              }}
+              disabled={(date) => date < startDate}
+            />
+          </View>
+        </View>
+      )}
+    </>
+  )
 
   return (
     <View className="min-h-screen bg-gray-50 pb-28">
@@ -362,7 +380,7 @@ export default function Generate() {
           <Button 
             variant="outline" 
             className="w-full justify-start h-11 border-gray-200"
-            onClick={() => setShowCalendar(true)}
+            onClick={() => setShowStartCalendar(true)}
           >
             <Text className="block text-sm text-gray-700">
               {format(startDate, 'yyyy年MM月dd日')}
@@ -370,34 +388,24 @@ export default function Generate() {
           </Button>
         </View>
 
-        {/* 行程时段 */}
+        {/* 行程结束日期 */}
         <View className="bg-white rounded-xl p-4 shadow-sm">
           <View className="flex items-center mb-3">
             <View className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-              <Clock size={16} color="#3b82f6" />
+              <CalendarRange size={16} color="#3b82f6" />
             </View>
-            <Text className="block text-sm font-medium text-gray-900 ml-2">行程时段</Text>
+            <Text className="block text-sm font-medium text-gray-900 ml-2">结束日期</Text>
+            <Text className="block text-xs text-gray-400 ml-auto">共 {tripDays} 天</Text>
           </View>
-          <View className="flex flex-wrap gap-2">
-            {timePeriodOptions.map(opt => (
-              <View
-                key={opt.value}
-                className="px-4 py-2 rounded-full border cursor-pointer transition-all"
-                onClick={() => setTimePeriod(opt.value)}
-                style={{
-                  backgroundColor: timePeriod === opt.value ? '#eff6ff' : '#f8fafc',
-                  borderColor: timePeriod === opt.value ? '#3b82f6' : '#e2e8f0'
-                }}
-              >
-                <Text 
-                  className="block text-sm"
-                  style={{ color: timePeriod === opt.value ? '#3b82f6' : '#64748b' }}
-                >
-                  {opt.label}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <Button 
+            variant="outline" 
+            className="w-full justify-start h-11 border-gray-200"
+            onClick={() => setShowEndCalendar(true)}
+          >
+            <Text className="block text-sm text-gray-700">
+              {format(endDate, 'yyyy年MM月dd日')}
+            </Text>
+          </Button>
         </View>
 
         {/* 出行方式 */}
@@ -594,7 +602,7 @@ export default function Generate() {
       </View>
 
       {/* 日历弹窗 */}
-      {renderCalendar()}
+      {renderCalendars()}
     </View>
   )
 }
