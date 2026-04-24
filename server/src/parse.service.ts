@@ -591,9 +591,34 @@ export class ParseService {
       // 判断是否为微信公众号文章
       const isWeChatArticle = realUrl.includes('mp.weixin.qq.com')
       
-      // 微信公众号文章使用原生 HTTP 获取
+      // 微信公众号文章使用 Playwright 获取
       if (isWeChatArticle) {
         return await this.fetchWeChatArticle(realUrl)
+      }
+      
+      // 判断是否为票务平台
+      const lowerUrl = realUrl.toLowerCase()
+      const isTicketPlatform = 
+        lowerUrl.includes('damai.cn') ||
+        lowerUrl.includes('dmai.cn') ||
+        lowerUrl.includes('piaoniu.com') ||
+        lowerUrl.includes('maoyan.com') ||
+        lowerUrl.includes('gewara.com') ||
+        lowerUrl.includes('yongzhou.cn') ||
+        lowerUrl.includes('shoukatsutravel') ||
+        lowerUrl.includes('ch住') ||
+        lowerUrl.includes('migu.cn') ||
+        lowerUrl.includes('music.163.com') ||
+        lowerUrl.includes('y.qq.com') ||
+        lowerUrl.includes('ticket') ||
+        lowerUrl.includes('票务') ||
+        lowerUrl.includes('演唱会') ||
+        lowerUrl.includes('音乐会') ||
+        lowerUrl.includes('戏剧')
+      
+      // 票务平台使用 Playwright 获取
+      if (isTicketPlatform) {
+        return await this.fetchTicketPlatform(realUrl)
       }
       
       // 其他网站使用 fetchClient
@@ -761,6 +786,123 @@ export class ParseService {
     }
   }
 
+  // 专门获取票务平台内容（使用 Playwright 渲染）
+  private async fetchTicketPlatform(url: string): Promise<{
+    success: boolean
+    content?: string
+    title?: string
+    coverImage?: string
+    imageUrls?: string[]
+    message?: string
+  }> {
+    let browser: playwright.Browser | null = null
+    try {
+      console.log(`[Parse] 票务平台内容，使用 Playwright 渲染获取: ${url}`)
+      
+      // 使用 Playwright 启动无头浏览器
+      browser = await playwright.chromium.launch({ 
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      })
+      const page = await browser.newPage()
+      
+      // 设置视口和用户代理
+      await page.setViewportSize({ width: 375, height: 812 })
+      await page.setExtraHTTPHeaders({
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
+      })
+      
+      // 访问页面并等待内容加载
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 20000 })
+      
+      // 等待页面主要元素加载
+      await page.waitForTimeout(2000) // 等待动态内容渲染
+      
+      // 获取标题
+      const title = await page.title()
+      console.log(`[Parse] 票务平台标题: ${title}`)
+      
+      // 获取页面主要内容
+      const content = await page.evaluate(() => {
+        // 尝试多种选择器获取主要内容
+        const selectors = [
+          'main', '.main-content', '.event-detail', '.product-info',
+          '[class*="content"]', '[class*="detail"]', '[class*="info"]',
+          'article', '.article', '#content', '#main'
+        ]
+        
+        let mainContent = ''
+        for (const selector of selectors) {
+          const el = document.querySelector(selector) as HTMLElement | null
+          if (el) {
+            const text = el.innerText || el.textContent || ''
+            if (text.length > mainContent.length) {
+              mainContent = text
+            }
+          }
+        }
+        
+        // 如果没找到，尝试获取 body
+        if (!mainContent || mainContent.length < 50) {
+          mainContent = document.body.innerText || document.body.textContent || ''
+        }
+        
+        // 清理文本
+        mainContent = mainContent.replace(/\s+/g, ' ').trim()
+        
+        // 限制长度
+        if (mainContent.length > 5000) {
+          mainContent = mainContent.slice(0, 5000)
+        }
+        
+        return mainContent
+      })
+      
+      console.log(`[Parse] 票务平台内容长度: ${content.length}`)
+      
+      // 获取页面中的图片
+      const imageUrls = await page.evaluate(() => {
+        const images = document.querySelectorAll('img')
+        const urls: string[] = []
+        
+        images.forEach((img) => {
+          let src = img.getAttribute('data-src') || img.getAttribute('src') || ''
+          // 过滤掉空白图、logo、icon 等
+          if (src && !src.includes('logo') && !src.includes('icon') && src.length > 50) {
+            urls.push(src)
+          }
+        })
+        
+        return urls.slice(0, 10) // 最多取10张图片
+      })
+      
+      console.log(`[Parse] 票务平台图片数量: ${imageUrls.length}`)
+      
+      // 获取封面图（通常是第一张大图）
+      const coverImage = imageUrls.length > 0 ? imageUrls[0] : ''
+      
+      if (!content) {
+        return { success: false, message: '无法提取票务页面内容' }
+      }
+      
+      return {
+        success: true,
+        content,
+        title,
+        coverImage,
+        imageUrls
+      }
+    } catch (error: any) {
+      console.error(`[Parse] 票务平台 Playwright 获取失败:`, error.message)
+      return { success: false, message: `获取票务信息失败: ${error.message}` }
+    } finally {
+      // 确保浏览器被关闭
+      if (browser) {
+        await browser.close().catch(() => {})
+      }
+    }
+  }
+
   // 检测来源类型
   private detectSourceType(url: string): SourceType {
     const lowerUrl = url.toLowerCase()
@@ -784,9 +926,21 @@ export class ParseService {
     // 二类：票务平台
     if (
       lowerUrl.includes('damai.cn') ||
-      lowerUrl.includes('摩天轮') ||
-      lowerUrl.includes('票牛') ||
-      lowerUrl.includes('大麦')
+      lowerUrl.includes('dmai.cn') ||
+      lowerUrl.includes('piaoniu.com') ||
+      lowerUrl.includes('maoyan.com') ||
+      lowerUrl.includes('gewara.com') ||
+      lowerUrl.includes('yongzhou.cn') ||
+      lowerUrl.includes('shoukatsutravel') ||
+      lowerUrl.includes('ch住') ||
+      lowerUrl.includes('migu.cn') ||
+      lowerUrl.includes('music.163.com') ||
+      lowerUrl.includes('y.qq.com') ||
+      lowerUrl.includes('ticket') ||
+      lowerUrl.includes('票务') ||
+      lowerUrl.includes('演唱会') ||
+      lowerUrl.includes('音乐会') ||
+      lowerUrl.includes('戏剧')
     ) {
       return 'ticket'
     }
