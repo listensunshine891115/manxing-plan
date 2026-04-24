@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image } from '@tarojs/components'
+import { View, Text } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { ShareSheet } from '@/components/share-sheet'
-import { Plus, Sparkles, MapPin } from 'lucide-react-taro'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Sparkles, MapPin, Calendar, Target, ChevronRight, Compass } from 'lucide-react-taro'
 import { Inspiration } from '@/types'
 import { Network } from '@/network'
 import './index.css'
+
+const typeConfig = {
+  spot: { color: '#3B82F6', label: '景点', icon: '🏛️' },
+  food: { color: '#F59E0B', label: '美食', icon: '🍜' },
+  show: { color: '#8B5CF6', label: '演出', icon: '🎭' },
+  hotel: { color: '#10B981', label: '住宿', icon: '🏨' }
+}
 
 const sourceConfig = {
   xiaohongshu: { color: '#FF2442', label: '小红书' },
@@ -17,23 +22,20 @@ const sourceConfig = {
   other: { color: '#64748B', label: '其他' }
 }
 
-const typeConfig = {
-  spot: { color: '#3B82F6', label: '景点' },
-  food: { color: '#F59E0B', label: '美食' },
-  show: { color: '#8B5CF6', label: '演出' },
-  hotel: { color: '#10B981', label: '住宿' }
-}
-
 export default function Index() {
   const [inspirations, setInspirations] = useState<Inspiration[]>([])
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
-  const [showShareSheet, setShowShareSheet] = useState(false)
+
+  // 模拟当前用户（实际应从登录态获取）
+  const userId = 'user_' + Date.now()
 
   // 加载灵感列表
   const fetchInspirations = async () => {
     try {
       const res = await Network.request({
-        url: '/api/trip/inspirations'
+        url: '/api/trip/inspirations',
+        data: { userId }
       })
       console.log('[GET] /api/trip/inspirations - Response:', JSON.stringify(res.data))
       if (res.data?.data) {
@@ -50,203 +52,190 @@ export default function Index() {
     fetchInspirations()
   }, [])
 
-  // 打开添加弹窗
-  const handleOpenAdd = () => {
-    setShowShareSheet(true)
+  // 切换选中状态
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id)
+        ? prev.filter(i => i !== id)
+        : [...prev, id]
+    )
   }
 
-  // 收藏灵感
-  const handleCollect = async (data: { url: string; title: string; type?: 'spot' | 'food' | 'show' | 'hotel' }) => {
-    try {
-      // 根据URL判断来源
-      let source = 'other'
-      const url = data.url.toLowerCase()
-      if (url.includes('xiaohongshu') || url.includes('xhs')) {
-        source = 'xiaohongshu'
-      } else if (url.includes('dianping') || url.includes('大众点评')) {
-        source = 'dazhong'
-      } else if (url.includes('damai') || url.includes('大麦')) {
-        source = 'damai'
-      }
-
-      const res = await Network.request({
-        url: '/api/trip/inspirations',
-        method: 'POST',
-        data: {
-          title: data.title,
-          image: '',
-          source,
-          type: data.type || 'spot'
-        }
-      })
-      console.log('[POST] /api/trip/inspirations - Response:', JSON.stringify(res.data))
-      
-      if (res.data?.data) {
-        setInspirations(prev => [res.data.data, ...prev])
-      }
-    } catch (error) {
-      console.error('收藏失败:', error)
+  // 全选/取消全选
+  const toggleAll = (type: 'spot' | 'food' | 'show' | 'hotel') => {
+    const typeIds = inspirations.filter(i => i.type === type).map(i => i.id)
+    const allSelected = typeIds.every(id => selectedIds.includes(id))
+    
+    if (allSelected) {
+      setSelectedIds(prev => prev.filter(id => !typeIds.includes(id)))
+    } else {
+      setSelectedIds(prev => [...new Set([...prev, ...typeIds])])
     }
   }
 
-  // 删除灵感
-  const handleDelete = async (id: string) => {
-    try {
-      const res = await Network.request({
-        url: `/api/trip/inspirations/${id}`,
-        method: 'DELETE'
-      })
-      console.log(`[DELETE] /api/trip/inspirations/${id} - Response:`, JSON.stringify(res.data))
-      setInspirations(prev => prev.filter(item => item.id !== id))
-    } catch (error) {
-      console.error('删除失败:', error)
+  // 开始规划
+  const handleStartPlan = () => {
+    if (selectedIds.length === 0) {
+      // 没选中任何灵感，全选所有
+      setSelectedIds(inspirations.map(i => i.id))
     }
+    // 跳转到设置页
+    window.location.href = '/pages/generate/index?selected=' + selectedIds.join(',')
   }
 
-  // 生成路线
-  const handleGenerate = () => {
-    if (inspirations.length === 0) {
-      return
-    }
-    window.location.href = '/pages/generate/index'
+  // 按类型分组
+  const groupedInspirations = {
+    spot: inspirations.filter(i => i.type === 'spot'),
+    food: inspirations.filter(i => i.type === 'food'),
+    show: inspirations.filter(i => i.type === 'show'),
+    hotel: inspirations.filter(i => i.type === 'hotel')
   }
 
   return (
-    <View className="min-h-screen bg-background pb-24">
+    <View className="min-h-screen bg-background pb-28">
       {/* 品牌标识区 */}
       <View className="brand-header">
         <View className="brand-logo">
-          <View className="logo-icon">
-            <Sparkles size={24} color="#3B82F6" />
-          </View>
+          <Sparkles size={24} color="#3B82F6" />
         </View>
-        <Text className="block text-xl font-semibold text-foreground">此刻与你漫行</Text>
-        <Text className="block text-sm text-muted-foreground mt-1">收集灵感，规划你的旅程</Text>
+        <Text className="block text-lg font-semibold text-foreground">此刻与你漫行</Text>
+        <Text className="block text-xs text-muted-foreground mt-1">勾选灵感，开启旅程</Text>
       </View>
 
-      {/* 操作栏 */}
-      <View className="px-4 py-3 flex items-center justify-between">
-        <View>
-          {inspirations.length > 0 && (
-            <Text className="block text-sm text-muted-foreground">
-              已收藏 <Text style={{ color: '#3B82F6', fontWeight: 600 }}>{inspirations.length}</Text> 个灵感
+      {/* 快捷入口 */}
+      <View className="px-4 mb-4">
+        <View className="quick-actions">
+          <View className="quick-action-item" onClick={() => window.location.href = '/pages/generate/index'}>
+            <View className="quick-action-icon" style={{ backgroundColor: '#EFF6FF' }}>
+              <Calendar size={20} color="#3B82F6" />
+            </View>
+            <Text className="block text-sm font-medium text-foreground">出行设置</Text>
+          </View>
+          <View className="quick-action-item" onClick={() => window.location.href = '/pages/manage/index'}>
+            <View className="quick-action-icon" style={{ backgroundColor: '#FEF3C7' }}>
+              <Target size={20} color="#F59E0B" />
+            </View>
+            <Text className="block text-sm font-medium text-foreground">灵感管理</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* 使用提示 */}
+      <View className="px-4 mb-4">
+        <View className="tip-card">
+          <Compass size={16} color="#10B981" className="mr-2 shrink-0" />
+          <Text className="block text-xs text-muted-foreground">
+            发送分享链接给账号即可自动收录灵感。勾选下方灵感，开始规划路线。
+          </Text>
+        </View>
+      </View>
+
+      {/* 灵感分类列表 */}
+      {(['spot', 'food', 'show', 'hotel'] as const).map(type => {
+        const items = groupedInspirations[type]
+        if (items.length === 0) return null
+        
+        const typeInfo = typeConfig[type]
+        const allSelected = items.every(i => selectedIds.includes(i.id))
+        
+        return (
+          <View key={type} className="mb-4">
+            {/* 类型标题 */}
+            <View className="px-4 flex items-center justify-between mb-2">
+              <View className="flex items-center">
+                <Text className="block mr-2">{typeInfo.icon}</Text>
+                <Text className="block text-base font-medium text-foreground">{typeInfo.label}</Text>
+                <Badge variant="secondary" className="ml-2 text-xs">{items.length}</Badge>
+              </View>
+              <View 
+                className="flex items-center"
+                onClick={() => toggleAll(type)}
+              >
+                <Checkbox checked={allSelected} className="mr-2" />
+                <Text className="block text-xs text-muted-foreground">
+                  {allSelected ? '取消全选' : '全选'}
+                </Text>
+              </View>
+            </View>
+
+            {/* 灵感卡片列表 */}
+            <View className="px-4 space-y-2">
+              {items.map(item => (
+                <View 
+                  key={item.id}
+                  className="inspiration-item"
+                  onClick={() => toggleSelect(item.id)}
+                >
+                  <Checkbox 
+                    checked={selectedIds.includes(item.id)} 
+                    className="mr-3 shrink-0"
+                  />
+                  <View className="inspiration-content">
+                    <Text className="block text-sm text-foreground line-clamp-1">
+                      {item.title}
+                    </Text>
+                    <View className="flex items-center mt-1">
+                      <Text 
+                        className="block text-xs"
+                        style={{ color: sourceConfig[item.source as keyof typeof sourceConfig]?.color }}
+                      >
+                        {sourceConfig[item.source as keyof typeof sourceConfig]?.label}
+                      </Text>
+                      {item.location?.name && (
+                        <>
+                          <Text className="block text-xs text-muted-foreground mx-1">·</Text>
+                          <MapPin size={10} color="#94A3B8" />
+                          <Text className="block text-xs text-muted-foreground ml-1 truncate">
+                            {item.location.name}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                  <ChevronRight size={16} color="#CBD5E1" className="shrink-0" />
+                </View>
+              ))}
+            </View>
+          </View>
+        )
+      })}
+
+      {/* 空状态 */}
+      {!loading && inspirations.length === 0 && (
+        <View className="empty-state">
+          <View className="empty-icon">
+            <MapPin size={40} color="#94A3B8" />
+          </View>
+          <Text className="block text-base font-medium text-foreground mb-2">暂无灵感</Text>
+          <Text className="block text-sm text-muted-foreground text-center leading-relaxed">
+            发送分享链接给账号即可{'\n'}自动收录到灵感池
+          </Text>
+        </View>
+      )}
+
+      {/* 底部固定操作栏 */}
+      <View className="fixed bottom-0 left-0 right-0 bg-background border-t border-border px-4 py-4 pb-8">
+        <View className="flex items-center justify-between mb-3">
+          <Text className="block text-sm text-muted-foreground">
+            已选择 <Text style={{ color: '#3B82F6', fontWeight: 600 }}>{selectedIds.length}</Text> 个灵感
+          </Text>
+          {selectedIds.length > 0 && (
+            <Text 
+              className="block text-xs text-primary"
+              onClick={() => setSelectedIds([])}
+            >
+              清空选择
             </Text>
           )}
         </View>
         <Button 
-          variant="default"
-          size="sm"
-          onClick={handleOpenAdd}
-          className="h-9 px-4"
-        >
-          <Plus size={16} color="#ffffff" className="mr-1" />
-          <Text className="block text-sm font-medium">添加灵感</Text>
-        </Button>
-      </View>
-
-      {/* 灵感列表 */}
-      <View className="px-4">
-        {loading ? (
-          <View className="waterfall-grid">
-            {[1, 2, 3, 4].map(i => (
-              <View key={i} className="card-wrapper">
-                <Card className="overflow-hidden">
-                  <Skeleton className="h-40 w-full rounded-none" />
-                  <CardContent className="p-3">
-                    <Skeleton className="h-4 w-3/4 mb-2" />
-                    <Skeleton className="h-3 w-1/2" />
-                  </CardContent>
-                </Card>
-              </View>
-            ))}
-          </View>
-        ) : inspirations.length === 0 ? (
-          <View className="empty-state">
-            <View className="empty-icon">
-              <MapPin size={40} color="#94A3B8" />
-            </View>
-            <Text className="block text-base font-medium text-foreground mb-2">开始你的旅行灵感收集</Text>
-            <Text className="block text-sm text-muted-foreground text-center leading-relaxed">
-              从小红书、大众点评等平台{'\n'}复制链接粘贴到这里
-            </Text>
-            <Button 
-              variant="outline"
-              size="lg"
-              onClick={handleOpenAdd}
-              className="mt-6 h-12 px-8"
-            >
-              <Plus size={18} color="#3B82F6" className="mr-2" />
-              <Text className="block text-sm font-medium" style={{ color: '#3B82F6' }}>添加第一个灵感</Text>
-            </Button>
-          </View>
-        ) : (
-          <View className="waterfall-grid">
-            {inspirations.map(item => (
-              <View key={item.id} className="card-wrapper">
-                <Card 
-                  className="overflow-hidden card-item"
-                  onLongPress={() => handleDelete(item.id)}
-                >
-                  <View className="relative">
-                    {item.image ? (
-                      <Image 
-                        src={item.image} 
-                        className="w-full h-40 object-cover"
-                        mode="aspectFill"
-                      />
-                    ) : (
-                      <View className="w-full h-40 bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-                        <MapPin size={32} color="#BFDBFE" />
-                      </View>
-                    )}
-                    <View 
-                      className="absolute top-2 right-2 px-2 py-1 rounded text-xs text-white"
-                      style={{ backgroundColor: sourceConfig[item.source as keyof typeof sourceConfig]?.color || '#64748B' }}
-                    >
-                      {sourceConfig[item.source as keyof typeof sourceConfig]?.label || '其他'}
-                    </View>
-                    <Badge 
-                      className="absolute bottom-2 left-2"
-                      style={{ backgroundColor: typeConfig[item.type as keyof typeof typeConfig]?.color || '#3B82F6' }}
-                    >
-                      {typeConfig[item.type as keyof typeof typeConfig]?.label || '景点'}
-                    </Badge>
-                  </View>
-                  <CardContent className="p-3">
-                    <Text className="block text-sm font-medium text-foreground line-clamp-2 mb-1">
-                      {item.title}
-                    </Text>
-                    {item.location && (
-                      <View className="flex items-center text-xs text-muted-foreground">
-                        <MapPin size={12} color="#94A3B8" className="mr-1" />
-                        <Text className="block truncate">{item.location.name}</Text>
-                      </View>
-                    )}
-                  </CardContent>
-                </Card>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-
-      {/* 底部固定按钮 */}
-      <View className="fixed bottom-0 left-0 right-0 bg-background border-t border-border px-4 py-4 pb-8">
-        <Button 
           className="w-full h-12 text-base font-medium"
-          onClick={handleGenerate}
-          disabled={inspirations.length === 0}
+          onClick={handleStartPlan}
         >
-          生成路线
+          开始规划
+          <ChevronRight size={18} color="#ffffff" className="ml-2" />
         </Button>
       </View>
-
-      {/* 分享收集弹窗 */}
-      <ShareSheet
-        open={showShareSheet}
-        onClose={() => setShowShareSheet(false)}
-        onCollect={handleCollect}
-      />
     </View>
   )
 }

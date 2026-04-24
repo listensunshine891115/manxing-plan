@@ -1,48 +1,74 @@
 /* 品牌标识区 */
 .brand-header {
-  padding: 24px 16px 16px;
+  padding: 20px 16px 12px;
   text-align: center;
 }
 
 .brand-logo {
-  margin-bottom: 12px;
-}
-
-.logo-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
+  margin: 0 auto 10px;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
-/* 瀑布流布局 */
-.waterfall-grid {
+/* 快捷入口 */
+.quick-actions {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  margin-left: -6px;
-  margin-right: -6px;
+  gap: 12px;
 }
 
-.card-wrapper {
-  width: 50%;
-  padding-left: 6px;
-  padding-right: 6px;
-  box-sizing: border-box;
-  margin-bottom: 12px;
-}
-
-.card-item {
+.quick-action-item {
+  flex: 1;
   background: var(--card);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
 }
 
-.line-clamp-2 {
+.quick-action-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+}
+
+/* 提示卡片 */
+.tip-card {
+  background: #F0FDF4;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* 灵感项 */
+.inspiration-item {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+}
+
+.inspiration-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.line-clamp-1 {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;

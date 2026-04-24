@@ -1,13 +1,33 @@
 .setting-card {
   background: var(--card);
   border-radius: 12px;
-  padding: 16px;
+  padding: 14px;
   border: 1px solid var(--border);
 }
 
 .setting-header {
   display: flex;
   align-items: center;
+}
+
+.city-tag {
+  padding: 6px 12px;
+  border-radius: 16px;
+  border: 1px solid;
+}
+
+.demand-item {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid;
+}
+
+.transport-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid;
 }
 
 .calendar-overlay {
@@ -29,4 +49,22 @@
   width: 100%;
   max-height: 80vh;
   overflow: auto;
+}
+
+/* 网格布局 */
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.grid-cols-2 > * {
+  width: calc(50% - 6px);
+}
+
+.grid-cols-2 > *:nth-child(odd) {
+  margin-right: 6px;
+}
+
+.grid-cols-2 > *:nth-child(even) {
+  margin-left: 6px;
 }
