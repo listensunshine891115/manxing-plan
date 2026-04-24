@@ -137,6 +137,54 @@ export class ParseService {
               coverImage = fetchResult.coverImage || ''
             }
           }
+        } else if (sourceType === 'article') {
+          // 社交图文平台（小红书等）：先解析短链接，再尝试 fetchUrl
+          const realUrl = await this.resolveShortUrl(url)
+          if (realUrl && realUrl !== url) {
+            console.log(`[Parse] 短链接已解析: ${url} -> ${realUrl}`)
+            url = realUrl
+          }
+
+          // 先尝试 fetchUrl 获取图文内容
+          const fetchResult = await this.fetchUrl(url)
+          if (fetchResult.success) {
+            content = fetchResult.content || ''
+            title = fetchResult.title || ''
+            coverImage = fetchResult.coverImage || ''
+          } else {
+            // 降级：尝试视频提取
+            console.log(`[Parse] 图文获取失败，尝试视频提取...`)
+            const subtitleResult = await this.extractVideoSubtitle(url)
+            if (subtitleResult) {
+              content = subtitleResult
+              title = ''
+            } else {
+              // 降级1：尝试 yt-dlp
+              const ytDlpResult = await this.getVideoInfoWithYtDlp(url)
+              if (ytDlpResult.success) {
+                content = ytDlpResult.description || ytDlpResult.title || ''
+                title = ytDlpResult.title || ''
+                coverImage = ytDlpResult.thumbnail || ''
+              } else {
+                // 降级2：直接返回原始文字内容
+                return {
+                  success: true,
+                  data: {
+                    name: this.extractTextFromInput(input.url || input.text || ''),
+                    source: '社交平台',
+                    type: '图文',
+                    location_name: '',
+                    time: '',
+                    price: '',
+                    description: input.url || input.text || '',
+                    tags: [],
+                    original_url: url,
+                  },
+                  message: '已收录，但未能获取详细信息'
+                }
+              }
+            }
+          }
         } else {
           // 其他平台：用 fetch 获取内容
           const fetchResult = await this.fetchUrl(url)
@@ -265,6 +313,49 @@ export class ParseService {
                 }
               } else {
                 return { success: false, message: '无法获取视频内容' }
+              }
+            }
+          }
+        } else if (sourceType === 'article') {
+          // 社交图文平台（小红书等）：先解析短链接，再尝试 fetchUrl
+          const realUrl = await this.resolveShortUrl(sourceUrl)
+          if (realUrl && realUrl !== sourceUrl) {
+            console.log(`[Parse] previewMultiple 短链接已解析: ${sourceUrl} -> ${realUrl}`)
+            sourceUrl = realUrl
+          }
+
+          // 先尝试 fetchUrl 获取图文内容
+          const fetchResult = await this.fetchUrl(sourceUrl)
+          if (fetchResult.success) {
+            content = fetchResult.content || ''
+            title = fetchResult.title || ''
+          } else {
+            // 降级：尝试视频提取
+            console.log(`[Parse] previewMultiple 图文获取失败，尝试视频提取...`)
+            const subtitleResult = await this.extractVideoSubtitle(sourceUrl)
+            if (subtitleResult) {
+              content = subtitleResult
+              title = ''
+            } else {
+              // 降级1：尝试 yt-dlp
+              const ytDlpResult = await this.getVideoInfoWithYtDlp(sourceUrl)
+              if (ytDlpResult.success) {
+                content = ytDlpResult.description || ytDlpResult.title || ''
+                title = ytDlpResult.title || ''
+              } else {
+                // 降级2：从输入文字中提取内容
+                if (input.text) {
+                  const textContent = this.extractTextFromInput(input.text)
+                  if (textContent) {
+                    console.log(`[Parse] previewMultiple 全部失败，降级使用输入文字`)
+                    content = textContent
+                    title = ''
+                  } else {
+                    return { success: false, message: '无法获取内容' }
+                  }
+                } else {
+                  return { success: false, message: '无法获取内容' }
+                }
               }
             }
           }
@@ -625,23 +716,30 @@ export class ParseService {
   private detectSourceType(url: string): SourceType {
     const lowerUrl = url.toLowerCase()
     
-    // 一类：社交短视频/图文平台（包括小红书）
+    // 一类：纯短视频平台（抖音、B站、快手等 - 这些都是视频）
     if (
-      lowerUrl.includes('douyin.com') ||
       lowerUrl.includes('v.douyin') ||
-      lowerUrl.includes('xiaohongshu.com') ||
-      lowerUrl.includes('xhslink.com') ||
       lowerUrl.includes('bilibili.com') ||
       lowerUrl.includes('b23.tv') ||
       lowerUrl.includes('kuaishou.com') ||
       lowerUrl.includes('ksurl.cn') ||
-      lowerUrl.includes('weishi.qq.com') ||
-      lowerUrl.includes('weibo.com')
+      lowerUrl.includes('weishi.qq.com')
     ) {
       return 'video'
     }
     
-    // 二类：票务平台
+    // 二类：社交图文/视频混合平台（微博、小红书）
+    // 这些平台既有视频也有图文，需要先解析短链接再判断
+    // 暂时返回 'article'，在后续流程中根据实际情况处理
+    if (
+      lowerUrl.includes('xiaohongshu.com') ||
+      lowerUrl.includes('xhslink.com') ||
+      lowerUrl.includes('weibo.com')
+    ) {
+      return 'article' // 图文优先，失败后再尝试视频
+    }
+    
+    // 三类：票务平台
     if (
       lowerUrl.includes('damai.cn') ||
       lowerUrl.includes('摩天轮') ||
@@ -651,7 +749,7 @@ export class ParseService {
       return 'ticket'
     }
     
-    // 三类：商户信息平台
+    // 四类：商户信息平台
     if (
       lowerUrl.includes('dianping.com') ||
       lowerUrl.includes('大众点评') ||
