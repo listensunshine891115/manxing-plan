@@ -4,6 +4,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client'
 import { AsrService } from './asr.service'
 import { AudioService } from './audio.service'
 import { VideoParseService } from './video-parse.service'
+import { execSync } from 'child_process'
 
 // 解析后的灵感数据
 export interface ParsedInspiration {
@@ -60,9 +61,12 @@ export class ParseService {
       let title: string
       let coverImage: string
 
+      // 从输入中提取 URL
+      const extractedUrl = this.extractUrl(input.url || input.text || '')
+
       // 判断输入类型
-      if (input.url && input.url.includes('http')) {
-        url = input.url
+      if (extractedUrl && extractedUrl.includes('http')) {
+        url = extractedUrl
         sourceType = this.detectSourceType(url)
 
         // 判断是否为短视频平台
@@ -75,13 +79,37 @@ export class ParseService {
             content = subtitleResult
             title = '' // 可以从字幕进一步提取
           } else {
-            // 降级：用 fetch 获取页面内容
-            const fetchResult = await this.fetchUrl(url)
-            if (!fetchResult.success) {
-              return { success: false, message: fetchResult.message || '获取页面失败' }
+            // 降级1：尝试用 yt-dlp 获取视频信息
+            const ytDlpResult = await this.getVideoInfoWithYtDlp(url)
+            if (ytDlpResult.success) {
+              content = ytDlpResult.description || ytDlpResult.title || ''
+              title = ytDlpResult.title || '未命名'
+              coverImage = ytDlpResult.thumbnail || ''
+            } else {
+              // 降级2：用 fetch 获取页面内容（可能失败）
+              const fetchResult = await this.fetchUrl(url)
+              if (!fetchResult.success) {
+                // 降级3：直接返回原始文字内容
+                return {
+                  success: true,
+                  data: {
+                    name: this.extractTextFromInput(input.url || input.text || ''),
+                    source: '社交短视频平台',
+                    type: '视频',
+                    location_name: '',
+                    time: '',
+                    price: '',
+                    description: input.url || input.text || '',
+                    tags: [],
+                    original_url: url,
+                  },
+                  message: '已收录，但未能获取详细信息'
+                }
+              }
+              content = fetchResult.content || ''
+              title = fetchResult.title || '未命名'
+              coverImage = fetchResult.coverImage || ''
             }
-            content = fetchResult.content || ''
-            title = fetchResult.title || '未命名'
           }
         } else {
           // 其他平台：用 fetch 获取内容
@@ -160,6 +188,37 @@ export class ParseService {
     } catch (error: any) {
       console.error(`[Parse] 字幕提取失败:`, error)
       return null
+    }
+  }
+
+  // 使用 yt-dlp 获取视频信息（降级方案）
+  private async getVideoInfoWithYtDlp(url: string): Promise<{
+    success: boolean
+    title?: string
+    description?: string
+    thumbnail?: string
+    message?: string
+  }> {
+    try {
+      console.log(`[Parse] 使用 yt-dlp 获取视频信息: ${url}`)
+
+      // 使用 yt-dlp 获取视频信息（不下载）
+      const cmd = `yt-dlp --dump-json --no-download --no-playlist "${url}"`
+      const output = execSync(cmd, { stdio: 'pipe', shell: '/bin/bash', timeout: 30000 })
+      const info = JSON.parse(output.toString())
+
+      return {
+        success: true,
+        title: info.title || '',
+        description: info.description || '',
+        thumbnail: info.thumbnail || '',
+      }
+    } catch (error: any) {
+      console.error(`[Parse] yt-dlp 获取视频信息失败:`, error.message)
+      return {
+        success: false,
+        message: `获取视频信息失败: ${error.message}`
+      }
     }
   }
 
@@ -251,6 +310,33 @@ export class ParseService {
     
     // 四类：文字网页/公众号
     return 'article'
+  }
+
+  // 从文本中提取 URL
+  private extractUrl(text: string): string {
+    if (!text) return ''
+    
+    // 匹配 http/https 开头的 URL
+    const urlPattern = /https?:\/\/[^\s\u4e00-\u9fa5（）！，。、;:：'""<>《》]+/gi
+    const matches = text.match(urlPattern)
+    
+    if (matches && matches.length > 0) {
+      // 返回第一个匹配的 URL，并去掉末尾的标点
+      return matches[0].replace(/[，。！、；：'""<>《》]+$/, '')
+    }
+    
+    return ''
+  }
+
+  // 从输入中提取纯文字（去掉 URL）
+  private extractTextFromInput(text: string): string {
+    if (!text) return ''
+    
+    // 去掉 URL
+    const textWithoutUrl = text.replace(/https?:\/\/[^\s]+/gi, '').trim()
+    
+    // 去掉多余的空白字符
+    return textWithoutUrl.replace(/\s+/g, ' ')
   }
 
   // 使用 LLM 提取关键信息
