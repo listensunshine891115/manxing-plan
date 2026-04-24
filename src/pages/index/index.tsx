@@ -310,14 +310,19 @@ export default function Index() {
       ...primaryTagConfig['美食']
     },
     { 
-      tag: '购物', 
-      count: inspirations.filter(i => i.primary_tag === '购物').length,
-      ...primaryTagConfig['购物']
+      tag: '演出', 
+      count: inspirations.filter(i => i.primary_tag === '演出').length,
+      ...primaryTagConfig['演出']
     },
     { 
       tag: '活动', 
       count: inspirations.filter(i => i.primary_tag === '活动').length,
       ...primaryTagConfig['活动']
+    },
+    { 
+      tag: '购物', 
+      count: inspirations.filter(i => i.primary_tag === '购物').length,
+      ...primaryTagConfig['购物']
     },
   ]
 
