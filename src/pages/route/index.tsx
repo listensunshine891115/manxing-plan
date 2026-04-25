@@ -1,4 +1,4 @@
-import { format } from 'date-fns'
+import { format, isBefore, startOfDay } from 'date-fns'
 import { useState, useEffect } from 'react'
 import { View, Text, Image, Picker } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
@@ -764,8 +764,10 @@ export default function Route() {
                     disabled={(date) => {
                       const startDateStr = parseDate(voteSetting.startDate).date
                       if (startDateStr) {
-                        const start = new Date(startDateStr)
-                        return date < start
+                        const start = startOfDay(new Date(startDateStr))
+                        const target = startOfDay(date)
+                        // 只有当目标日期严格早于出发日期时才禁用（允许选择同一天）
+                        return isBefore(target, start)
                       }
                       return false
                     }}
