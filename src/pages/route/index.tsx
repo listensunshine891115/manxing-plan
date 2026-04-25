@@ -5,8 +5,9 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   ArrowLeft, Share2, ChevronUp, ChevronDown, MapPin, Clock, 
-  Navigation, Sparkles, Route as RouteIcon, Circle
+  Navigation, Sparkles, Route as RouteIcon, Circle, Users, ThumbsUp
 } from 'lucide-react-taro'
+import { Network } from '@/network'
 import Taro from '@tarojs/taro'
 import './index.css'
 
@@ -78,6 +79,8 @@ export default function Route() {
   const [routePlan, setRoutePlan] = useState<RoutePlanResult | null>(null)
   const [versions, setVersions] = useState<RouteVersion[]>([])
   const [loading, setLoading] = useState(true)
+  const [voteSession, setVoteSession] = useState<{ shareCode: string; sessionId: string } | null>(null)
+  const [voteStats, setVoteStats] = useState<Record<string, { likes: number; dislikes: number }>>({})
 
   // 加载路线规划结果
   useEffect(() => {
@@ -130,8 +133,100 @@ export default function Route() {
     Taro.showToast({ title: '行程已确认！', icon: 'success' })
   }
 
-  const handleShareVote = () => {
-    Taro.showToast({ title: '分享功能开发中', icon: 'none' })
+  // 处理分享投票
+  const handleShareVote = async () => {
+    if (!routePlan) return
+
+    try {
+      Taro.showLoading({ title: '创建投票链接...' })
+
+      // 获取用户信息
+      const userInfo = Taro.getStorageSync('userInfo')
+      const nickname = userInfo?.nickname || '旅行达人'
+
+      // 准备灵感点数据
+      const inspirationPoints = routePlan.route.map(item => ({
+        id: item.id,
+        title: item.title,
+        image: item.image,
+        location: item.location,
+        type: item.type,
+        primaryTag: typeConfig[item.type || 'spot']?.label || '景点',
+      }))
+
+      // 创建投票会话
+      const res = await Network.request({
+        url: '/api/vote/sessions',
+        method: 'POST',
+        data: {
+          tripId: 'route_' + Date.now(),
+          title: routePlan.settings.mainDestination || '漫行计划',
+          creatorName: nickname,
+          inspirationPoints,
+          expiresDays: 7,
+        },
+      })
+
+      console.log('[Route] 创建投票会话响应:', res.data)
+
+      if (res.data.code === 200 && res.data.data) {
+        const { shareCode, sessionId } = res.data.data
+        setVoteSession({ shareCode, sessionId })
+
+        // 加载投票统计
+        loadVoteStats(sessionId)
+
+        // 生成分享链接
+        const shareUrl = `/pages/vote/index?code=${shareCode}`
+
+        Taro.hideLoading()
+
+        // 显示分享选项
+        Taro.showModal({
+          title: '分享投票链接',
+          content: `已创建投票链接，好友打开即可投票参与路线设计！\n\n点击确定复制链接`,
+          confirmText: '复制链接',
+          cancelText: '稍后',
+          success: (modalRes) => {
+            if (modalRes.confirm) {
+              // 复制链接到剪贴板
+              Taro.setClipboardData({
+                data: shareUrl,
+                success: () => {
+                  Taro.showToast({ title: '链接已复制', icon: 'success' })
+                }
+              })
+            }
+          }
+        })
+      } else {
+        Taro.hideLoading()
+        Taro.showToast({ title: res.data.msg || '创建失败', icon: 'none' })
+      }
+    } catch (error) {
+      Taro.hideLoading()
+      console.error('[Route] 创建投票会话失败:', error)
+      Taro.showToast({ title: '创建失败，请重试', icon: 'none' })
+    }
+  }
+
+  // 加载投票统计
+  const loadVoteStats = async (sessionId: string) => {
+    try {
+      const res = await Network.request({
+        url: `/api/vote/results/${sessionId}`,
+      })
+
+      if (res.data.code === 200 && res.data.data) {
+        const stats: Record<string, { likes: number; dislikes: number }> = {}
+        res.data.data.forEach((item: { inspirationId: string; likes: number; dislikes: number }) => {
+          stats[item.inspirationId] = { likes: item.likes, dislikes: item.dislikes }
+        })
+        setVoteStats(stats)
+      }
+    } catch (error) {
+      console.error('[Route] 加载投票统计失败:', error)
+    }
   }
 
   const handleRegenerate = () => {
@@ -302,16 +397,31 @@ export default function Route() {
                           </View>
                         )}
                         <View className="flex-1 min-w-0">
-                          <View className="flex items-center gap-2 mb-1">
-                            <Text className="block text-sm font-medium text-foreground truncate">
-                              {item.title}
-                            </Text>
-                            <Badge
-                              className="text-xs px-2 py-1"
-                              style={{ backgroundColor: typeConfig[item.type]?.color || '#3B82F6' }}
-                            >
-                              {typeConfig[item.type]?.label || '地点'}
-                            </Badge>
+                          <View className="flex items-center justify-between mb-1">
+                            <View className="flex items-center gap-2 flex-1 min-w-0">
+                              <Text className="block text-sm font-medium text-foreground truncate">
+                                {item.title}
+                              </Text>
+                              <Badge
+                                className="text-xs px-2 py-1"
+                                style={{ backgroundColor: typeConfig[item.type]?.color || '#3B82F6' }}
+                              >
+                                {typeConfig[item.type]?.label || '地点'}
+                              </Badge>
+                            </View>
+                            {/* 投票统计 */}
+                            {voteSession && voteStats[item.inspirationId] && (
+                              <View className="flex items-center gap-1 ml-2 shrink-0">
+                                <ThumbsUp size={12} color="#22C55E" />
+                                <Text className="text-xs text-green-500">
+                                  {voteStats[item.inspirationId].likes}
+                                </Text>
+                                <Text className="text-xs text-gray-300 mx-1">/</Text>
+                                <Text className="text-xs text-red-400">
+                                  {voteStats[item.inspirationId].dislikes}
+                                </Text>
+                              </View>
+                            )}
                           </View>
                           <View className="flex items-center text-xs text-muted-foreground mb-1">
                             <MapPin size={12} color="#94A3B8" className="mr-1" />
@@ -345,6 +455,17 @@ export default function Route() {
         ))}
       </View>
 
+      {/* 投票信息 */}
+      {voteSession && (
+        <View className="mx-4 mt-2 p-3 bg-green-50 rounded-xl border border-green-200 flex items-center justify-between">
+          <View className="flex items-center">
+            <Users size={16} color="#22C55E" className="mr-2" />
+            <Text className="text-sm text-green-600">投票链接已分享</Text>
+          </View>
+          <Text className="text-xs text-green-500">等待好友投票</Text>
+        </View>
+      )}
+
       {/* 底部操作栏 */}
       <View 
         style={{
@@ -355,12 +476,14 @@ export default function Route() {
       >
         <View className="flex gap-3 mb-3">
           <Button
-            variant="outline"
-            className="flex-1 h-12"
+            variant={voteSession ? "outline" : "outline"}
+            className={`flex-1 h-12 ${voteSession ? 'border-green-500' : ''}`}
             onClick={handleShareVote}
           >
-            <Share2 size={18} color="#3B82F6" className="mr-2" />
-            <Text>分享投票</Text>
+            <Share2 size={18} color={voteSession ? "#22C55E" : "#3B82F6"} className="mr-2" />
+            <Text style={{ color: voteSession ? '#22C55E' : '#3B82F6' }}>
+              {voteSession ? '已分享' : '分享投票'}
+            </Text>
           </Button>
           <Button
             className="flex-1 h-12 text-base font-medium"

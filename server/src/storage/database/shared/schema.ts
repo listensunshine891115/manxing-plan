@@ -1,98 +1,122 @@
-import { pgTable, serial, timestamp, varchar, jsonb, integer, index, boolean } from "drizzle-orm/pg-core"
+import { pgTable, index, foreignKey, varchar, timestamp, serial, jsonb, integer, boolean, unique, text } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
-// 用户表 - 存储微信用户信息
-export const users = pgTable(
-  "users",
-  {
-    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-    openid: varchar("openid", { length: 64 }).unique(), // 微信小程序 openid
-    wx_openid: varchar("wx_openid", { length: 64 }).unique(), // 微信公众号 openid
-    unionid: varchar("unionid", { length: 64 }), // 微信 unionid
-    nickname: varchar("nickname", { length: 50 }), // 昵称
-    avatar: varchar("avatar", { length: 500 }), // 头像
-    user_code: varchar("user_code", { length: 10 }).unique().notNull(), // 用户码，用于公众号绑定
-    create_time: timestamp("create_time", { withTimezone: true }).defaultNow().notNull(),
-    update_time: timestamp("update_time", { withTimezone: true }),
-  },
-  (table) => [
-    index("users_openid_idx").on(table.openid),
-    index("users_wx_openid_idx").on(table.wx_openid),
-    index("users_user_code_idx").on(table.user_code),
-  ]
-)
+// PostgreSQL gen_random_uuid() 函数
+const gen_random_uuid = () => sql`gen_random_uuid()`
 
-// 灵感表 - 存储用户收藏的旅行灵感
-export const inspirations = pgTable(
-  "inspirations",
-  {
-    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-    user_id: varchar("user_id", { length: 36 }),
-    title: varchar("title", { length: 255 }).notNull(),
-    image: varchar("image", { length: 500 }),
-    source: varchar("source", { length: 20 }).notNull().default("other"),
-    type: varchar("type", { length: 20 }).notNull().default("spot"),
-    location: jsonb("location"),
-    time: varchar("time", { length: 50 }),
-    price: integer("price"),
-    rating: integer("rating"),
-    create_time: timestamp("create_time", { withTimezone: true }).defaultNow().notNull(),
-    update_time: timestamp("update_time", { withTimezone: true }),
-  },
-  (table) => [
-    index("inspirations_user_id_idx").on(table.user_id),
-    index("inspirations_type_idx").on(table.type),
-    index("inspirations_create_time_idx").on(table.create_time),
-  ]
-)
 
-// 行程表
-export const trips = pgTable(
-  "trips",
-  {
-    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-    user_id: varchar("user_id", { length: 36 }),
-    version_name: varchar("version_name", { length: 50 }).notNull().default("默认方案"),
-    content: jsonb("content").notNull(),
-    vote_count: integer("vote_count").notNull().default(0),
-    is_final: boolean("is_final").notNull().default(false),
-    settings: jsonb("settings"),
-    create_time: timestamp("create_time", { withTimezone: true }).defaultNow().notNull(),
-    update_time: timestamp("update_time", { withTimezone: true }),
-  },
-  (table) => [
-    index("trips_user_id_idx").on(table.user_id),
-    index("trips_is_final_idx").on(table.is_final),
-    index("trips_create_time_idx").on(table.create_time),
-  ]
-)
 
-// 投票表
-export const votes = pgTable(
-  "votes",
-  {
-    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-    trip_id: varchar("trip_id", { length: 36 }).notNull().references(() => trips.id),
-    voter_id: varchar("voter_id", { length: 36 }).notNull(),
-    voter_name: varchar("voter_name", { length: 50 }).notNull().default("匿名用户"),
-    version_id: varchar("version_id", { length: 36 }).notNull(),
-    create_time: timestamp("create_time", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("votes_trip_id_idx").on(table.trip_id),
-    index("votes_voter_id_idx").on(table.voter_id),
-    index("votes_version_id_idx").on(table.version_id),
-  ]
-)
+export const votes = pgTable("votes", {
+	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	tripId: varchar("trip_id", { length: 36 }).notNull(),
+	voterId: varchar("voter_id", { length: 36 }).notNull(),
+	voterName: varchar("voter_name", { length: 50 }).default('匿名用户').notNull(),
+	versionId: varchar("version_id", { length: 36 }).notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("votes_trip_id_idx").using("btree", table.tripId.asc().nullsLast().op("text_ops")),
+	index("votes_version_id_idx").using("btree", table.versionId.asc().nullsLast().op("text_ops")),
+	index("votes_voter_id_idx").using("btree", table.voterId.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.tripId],
+			foreignColumns: [trips.id],
+			name: "votes_trip_id_trips_id_fk"
+		}),
+]);
 
 export const healthCheck = pgTable("health_check", {
 	id: serial().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 });
 
-export type Inspiration = typeof inspirations.$inferSelect;
-export type InsertInspiration = typeof inspirations.$inferInsert;
-export type Trip = typeof trips.$inferSelect;
-export type InsertTrip = typeof trips.$inferInsert;
-export type Vote = typeof votes.$inferSelect;
-export type InsertVote = typeof votes.$inferInsert;
+export const trips = pgTable("trips", {
+	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	userId: varchar("user_id", { length: 36 }),
+	versionName: varchar("version_name", { length: 50 }).default('默认方案').notNull(),
+	content: jsonb().notNull(),
+	voteCount: integer("vote_count").default(0).notNull(),
+	isFinal: boolean("is_final").default(false).notNull(),
+	settings: jsonb(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updateTime: timestamp("update_time", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("trips_create_time_idx").using("btree", table.createTime.asc().nullsLast().op("timestamptz_ops")),
+	index("trips_is_final_idx").using("btree", table.isFinal.asc().nullsLast().op("bool_ops")),
+	index("trips_user_id_idx").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+]);
+
+export const users = pgTable("users", {
+	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	openid: varchar({ length: 64 }),
+	unionid: varchar({ length: 64 }),
+	nickname: varchar({ length: 50 }),
+	avatar: varchar({ length: 500 }),
+	userCode: varchar("user_code", { length: 10 }).notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updateTime: timestamp("update_time", { withTimezone: true, mode: 'string' }),
+	wxOpenid: varchar("wx_openid", { length: 64 }),
+}, (table) => [
+	index("users_openid_idx").using("btree", table.openid.asc().nullsLast().op("text_ops")),
+	index("users_user_code_idx").using("btree", table.userCode.asc().nullsLast().op("text_ops")),
+	index("users_wx_openid_idx").using("btree", table.wxOpenid.asc().nullsLast().op("text_ops")),
+	unique("users_openid_unique").on(table.openid),
+	unique("users_user_code_unique").on(table.userCode),
+	unique("users_wx_openid_unique").on(table.wxOpenid),
+]);
+
+export const inspirations = pgTable("inspirations", {
+	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	userId: varchar("user_id", { length: 36 }),
+	title: varchar({ length: 255 }).notNull(),
+	image: varchar({ length: 500 }),
+	source: varchar({ length: 20 }).default('other').notNull(),
+	primaryTag: varchar("primary_tag", { length: 20 }).default('spot').notNull(),
+	location: jsonb(),
+	time: varchar({ length: 50 }),
+	price: text(),
+	rating: integer(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updateTime: timestamp("update_time", { withTimezone: true, mode: 'string' }),
+	description: text(),
+	originalUrl: text("original_url"),
+	tags: text().array(),
+	locationName: text("location_name"),
+	secondaryTag: varchar("secondary_tag", { length: 100 }),
+	isFavorite: boolean("is_favorite").default(false),
+}, (table) => [
+	index("inspirations_create_time_idx").using("btree", table.createTime.asc().nullsLast().op("timestamptz_ops")),
+	index("inspirations_type_idx").using("btree", table.primaryTag.asc().nullsLast().op("text_ops")),
+	index("inspirations_user_id_idx").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+]);
+
+export const voteRecords = pgTable("vote_records", {
+	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	sessionId: varchar("session_id", { length: 36 }).notNull(),
+	inspirationId: varchar("inspiration_id", { length: 36 }).notNull(),
+	inspirationTitle: varchar("inspiration_title", { length: 255 }).notNull(),
+	voterOpenid: varchar("voter_openid", { length: 64 }),
+	voterName: varchar("voter_name", { length: 50 }).default('微信用户').notNull(),
+	voteValue: integer("vote_value").notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("vote_records_inspiration_id_idx").using("btree", table.inspirationId.asc().nullsLast().op("text_ops")),
+	index("vote_records_session_id_idx").using("btree", table.sessionId.asc().nullsLast().op("text_ops")),
+	index("vote_records_voter_openid_idx").using("btree", table.voterOpenid.asc().nullsLast().op("text_ops")),
+	unique("vote_records_unique").on(table.sessionId, table.inspirationId, table.voterOpenid),
+]);
+
+export const voteSessions = pgTable("vote_sessions", {
+	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	tripId: varchar("trip_id", { length: 36 }).notNull(),
+	shareCode: varchar("share_code", { length: 16 }).notNull(),
+	title: varchar({ length: 255 }).notNull(),
+	creatorName: varchar("creator_name", { length: 50 }),
+	inspirationPoints: jsonb("inspirationPoints").notNull(),
+	expiresAt: timestamp("expires_at", { withTimezone: true, mode: 'string' }),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("vote_sessions_create_time_idx").using("btree", table.createTime.asc().nullsLast().op("timestamptz_ops")),
+	index("vote_sessions_share_code_idx").using("btree", table.shareCode.asc().nullsLast().op("text_ops")),
+	index("vote_sessions_trip_id_idx").using("btree", table.tripId.asc().nullsLast().op("text_ops")),
+	unique("vote_sessions_share_code_unique").on(table.shareCode),
+]);

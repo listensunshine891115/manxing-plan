@@ -10,10 +10,12 @@ import { AsrService } from '@/asr.service'
 import { AudioService } from '@/audio.service'
 import { VideoParseService } from '@/video-parse.service'
 import { MapService } from '@/map.service'
+import { VoteController } from '@/vote.controller'
+import { VoteService } from '@/vote.service'
 
 @Module({
   imports: [],
-  controllers: [AppController, TripController, MessageController],
+  controllers: [AppController, TripController, MessageController, VoteController],
   providers: [
     AppService,
     TripService,
@@ -23,6 +25,7 @@ import { MapService } from '@/map.service'
     AudioService,
     VideoParseService,
     MapService,
+    VoteService,
   ],
 })
 export class AppModule {}

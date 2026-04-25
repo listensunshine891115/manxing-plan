@@ -1,3 +1,7 @@
 export default typeof definePageConfig === 'function'
-  ? definePageConfig({ navigationBarTitleText: '投票选择' })
-  : { navigationBarTitleText: '投票选择' }
+  ? definePageConfig({
+      navigationBarTitleText: '同伴投票',
+      enableShareAppMessage: true,
+      enableShareTimeline: true,
+    })
+  : { navigationBarTitleText: '同伴投票' }
