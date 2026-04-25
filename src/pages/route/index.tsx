@@ -84,9 +84,14 @@ export default function Route() {
   const [voteSession, setVoteSession] = useState<{ shareCode: string; sessionId: string; voteDeadline: string } | null>(null)
   const [voteStats, setVoteStats] = useState<Record<string, { likes: number; dislikes: number }>>({})
   const [voteSettingVisible, setVoteSettingVisible] = useState(false)
+  const getDefaultDateTime = (daysFromNow: number, hour: number = 9) => {
+    const d = new Date(Date.now() + daysFromNow * 86400000)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00`
+  }
+  
   const [voteSetting, setVoteSetting] = useState({
-    startDate: '',
-    endDate: '',
+    startDate: getDefaultDateTime(1, 9),
+    endDate: getDefaultDateTime(1, 18),
     meetupPlace: [] as string[],
     meetupInput: '',
     voteDeadline: '',
@@ -170,14 +175,13 @@ export default function Route() {
     }
 
     // 初始化投票设置
-    const today = new Date()
-    const defaultDeadline = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000) // 3天后
+    const defaultDeadline = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3天后
     const formatDateTime = (d: Date) => {
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
     }
     setVoteSetting({
-      startDate: '',
-      endDate: '',
+      startDate: getDefaultDateTime(1, 9),
+      endDate: getDefaultDateTime(1, 18),
       meetupPlace: [],
       meetupInput: '',
       voteDeadline: formatDateTime(defaultDeadline),
@@ -605,31 +609,58 @@ export default function Route() {
               <Text className="block text-sm font-medium text-gray-700 mb-2">旅行日期</Text>
               <View className="flex items-center gap-2">
                 <View className="flex-1">
-                  <Text className="block text-xs text-gray-500 mb-1">起始时间</Text>
+                  <Text className="block text-xs text-gray-500 mb-1">出发日期</Text>
                   <Input
-                    type="datetime-local"
+                    type="date"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                    value={voteSetting.startDate}
+                    value={voteSetting.startDate.split('T')[0] || ''}
                     onInput={(e: any) => setVoteSetting(prev => ({ 
                       ...prev, 
-                      startDate: e.detail.value,
+                      startDate: e.detail.value + 'T' + (prev.startDate.split('T')[1] || '09:00'),
                     }))}
-                    placeholder="选择日期和时间"
+                    placeholder="选择日期"
                   />
                 </View>
-                <Text className="text-gray-400 mt-4">至</Text>
-                <View className="flex-1">
-                  <Text className="block text-xs text-gray-500 mb-1">返程时间</Text>
+                <View className="w-16">
+                  <Text className="block text-xs text-gray-500 mb-1">时间</Text>
                   <Input
-                    type="datetime-local"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                    value={voteSetting.endDate}
-                    min={voteSetting.startDate || undefined}
+                    type="time"
+                    className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm text-center"
+                    value={voteSetting.startDate.split('T')[1] || '09:00'}
                     onInput={(e: any) => setVoteSetting(prev => ({ 
                       ...prev, 
-                      endDate: e.detail.value,
+                      startDate: (prev.startDate.split('T')[0] || e.detail.value) + 'T' + e.detail.value,
                     }))}
-                    placeholder="选择日期和时间"
+                    placeholder="时间"
+                  />
+                </View>
+              </View>
+              <View className="flex items-center gap-2 mt-2">
+                <View className="flex-1">
+                  <Text className="block text-xs text-gray-500 mb-1">返程日期</Text>
+                  <Input
+                    type="date"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    value={voteSetting.endDate.split('T')[0] || ''}
+                    min={voteSetting.startDate.split('T')[0] || undefined}
+                    onInput={(e: any) => setVoteSetting(prev => ({ 
+                      ...prev, 
+                      endDate: e.detail.value + 'T' + (prev.endDate.split('T')[1] || '18:00'),
+                    }))}
+                    placeholder="选择日期"
+                  />
+                </View>
+                <View className="w-16">
+                  <Text className="block text-xs text-gray-500 mb-1">时间</Text>
+                  <Input
+                    type="time"
+                    className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm text-center"
+                    value={voteSetting.endDate.split('T')[1] || '18:00'}
+                    onInput={(e: any) => setVoteSetting(prev => ({ 
+                      ...prev, 
+                      endDate: (prev.endDate.split('T')[0] || e.detail.value) + 'T' + e.detail.value,
+                    }))}
+                    placeholder="时间"
                   />
                 </View>
               </View>
