@@ -86,9 +86,6 @@ export class MapService {
     }
   }
 
-      if (data.status === '1' && data.pois && data.pois.length > 0) {
-  
-
   /**
    * 智能排序灵感点：基于地理位置优化顺序
    * 使用最近邻算法优化路线
@@ -212,6 +209,26 @@ export class MapService {
 
     console.log(`[MapService] 路线优化完成，使用道路距离计算`)
     return routeWithDistance
+  }
+
+  /**
+   * 计算两点之间的直线距离（Haversine 公式）
+   */
+  private calculateDistance(point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number {
+    const R = 6371 // 地球半径（公里）
+    const dLat = this.toRad(point2.lat - point1.lat)
+    const dLng = this.toRad(point2.lng - point1.lng)
+    
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(this.toRad(point1.lat)) * Math.cos(this.toRad(point2.lat)) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2)
+    
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+
+  private toRad(deg: number): number {
+    return deg * (Math.PI / 180)
   }
 
   /**
