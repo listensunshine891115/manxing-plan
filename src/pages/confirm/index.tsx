@@ -57,6 +57,8 @@ interface RoutePlanResult {
     transportMode?: 'public' | 'self-drive'
     // 投票截止时间
     voteDeadline?: string
+    // 是否邀请同伴投票
+    inviteCompanion?: boolean
   }
 }
 
@@ -265,9 +267,15 @@ export default function Confirm() {
     }
   }
 
-  // 确认按钮点击 - 显示选择弹窗
+  // 确认按钮点击 - 根据是否邀请同伴决定后续流程
   const handleConfirm = () => {
-    setShowVoteChoice(true)
+    // 如果是邀请同伴投票，显示选择弹窗
+    if (routePlan?.settings?.inviteCompanion) {
+      setShowVoteChoice(true)
+    } else {
+      // 自己出行，直接保存并跳转到行程概览
+      handleSaveToOverview()
+    }
   }
 
   // 用户选择需要投票

@@ -76,6 +76,8 @@ interface RoutePlanResult {
     transportMode?: 'public' | 'self-drive'
     // 投票截止时间
     voteDeadline?: string
+    // 是否邀请同伴投票
+    inviteCompanion?: boolean
   }
 }
 
@@ -359,6 +361,8 @@ export default function Generate() {
         result.settings.transportMode = transportMode
         // 保存投票截止时间
         result.settings.voteDeadline = voteDeadline.toISOString()
+        // 保存是否邀请同伴投票
+        result.settings.inviteCompanion = inviteCompanion
 
         await Taro.setStorage({ key: 'routePlanResult', data: result })
         Taro.navigateTo({ url: '/pages/confirm/index' })
