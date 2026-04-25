@@ -1,4 +1,3 @@
-import { format } from 'date-fns'
 import { useState, useEffect } from 'react'
 import { View, Text, Image, Picker } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
@@ -85,14 +84,24 @@ export default function Route() {
   const [voteSession, setVoteSession] = useState<{ shareCode: string; sessionId: string; voteDeadline: string } | null>(null)
   const [voteStats, setVoteStats] = useState<Record<string, { likes: number; dislikes: number }>>({})
   const [voteSettingVisible, setVoteSettingVisible] = useState(false)
-  const getDefaultDateTime = (daysFromNow: number, hour: number = 9) => {
+  // 获取北京时间日期时间字符串 (UTC+8)
+  const getBeijingDateTime = (daysFromNow: number, hour: number = 9) => {
     const d = new Date(Date.now() + daysFromNow * 86400000)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00`
+    const beijingOffset = 8 * 60 * 60 * 1000 // 北京时区偏移量
+    const beijingTime = new Date(d.getTime() + beijingOffset)
+    return `${beijingTime.getUTCFullYear()}-${String(beijingTime.getUTCMonth() + 1).padStart(2, '0')}-${String(beijingTime.getUTCDate()).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00`
+  }
+  
+  // 获取北京时间今天的日期字符串 (UTC+8)
+  const getBeijingDate = (date: Date = new Date()) => {
+    const beijingOffset = 8 * 60 * 60 * 1000 // 北京时区偏移量
+    const beijingTime = new Date(date.getTime() + beijingOffset)
+    return `${beijingTime.getUTCFullYear()}-${String(beijingTime.getUTCMonth() + 1).padStart(2, '0')}-${String(beijingTime.getUTCDate()).padStart(2, '0')}`
   }
   
   const [voteSetting, setVoteSetting] = useState({
-    startDate: getDefaultDateTime(0, 9),
-    endDate: getDefaultDateTime(0, 18),
+    startDate: getBeijingDateTime(0, 9),
+    endDate: getBeijingDateTime(0, 18),
     meetupPlace: [] as string[],
     meetupInput: '',
     voteDeadline: '',
@@ -186,17 +195,19 @@ export default function Route() {
       return
     }
 
-    // 初始化投票设置
+    // 初始化投票设置（使用北京时间）
     const defaultDeadline = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3天后
-    const formatDateTime = (d: Date) => {
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    const formatBeijingDateTime = (d: Date) => {
+      const beijingOffset = 8 * 60 * 60 * 1000
+      const beijingTime = new Date(d.getTime() + beijingOffset)
+      return `${beijingTime.getUTCFullYear()}-${String(beijingTime.getUTCMonth() + 1).padStart(2, '0')}-${String(beijingTime.getUTCDate()).padStart(2, '0')}T${String(beijingTime.getUTCHours()).padStart(2, '0')}:${String(beijingTime.getUTCMinutes()).padStart(2, '0')}`
     }
     setVoteSetting({
-      startDate: getDefaultDateTime(1, 9),
-      endDate: getDefaultDateTime(1, 18),
+      startDate: getBeijingDateTime(1, 9),
+      endDate: getBeijingDateTime(1, 18),
       meetupPlace: [],
       meetupInput: '',
-      voteDeadline: formatDateTime(defaultDeadline),
+      voteDeadline: formatBeijingDateTime(defaultDeadline),
     })
     setVoteSettingVisible(true)
   }
@@ -625,8 +636,8 @@ export default function Route() {
                   <View className="border border-gray-200 rounded-lg overflow-hidden">
                     <Picker
                       mode="date"
-                      value={parseDate(voteSetting.startDate).date || format(new Date(), 'yyyy-MM-dd')}
-                      start={format(new Date(), 'yyyy-MM-dd')}
+                      value={parseDate(voteSetting.startDate).date || getBeijingDate()}
+                      start={getBeijingDate()}
                       onChange={(e: any) => {
                         const newDate = e.detail.value
                         setVoteSetting(prev => ({
@@ -671,8 +682,8 @@ export default function Route() {
                   <View className="border border-gray-200 rounded-lg overflow-hidden">
                     <Picker
                       mode="date"
-                      value={parseDate(voteSetting.endDate).date || format(new Date(), 'yyyy-MM-dd')}
-                      start={`${parseDate(voteSetting.startDate).date}T00:00:00`}
+                      value={parseDate(voteSetting.endDate).date || getBeijingDate()}
+                      start={`${parseDate(voteSetting.startDate).date || getBeijingDate()}T00:00:00`}
                       onChange={(e: any) => {
                         const newDate = e.detail.value
                         setVoteSetting(prev => ({
