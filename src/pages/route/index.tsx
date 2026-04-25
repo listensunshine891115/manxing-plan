@@ -1,13 +1,15 @@
+import { format } from 'date-fns'
 import { useState, useEffect } from 'react'
-import { View, Text, Image } from '@tarojs/components'
+import { View, Text, Image, Picker } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Calendar } from '@/components/ui/calendar'
 import { 
   ArrowLeft, Share2, ChevronUp, ChevronDown, MapPin, Clock, 
-  Navigation, Sparkles, Route as RouteIcon, Circle, Users, ThumbsUp, X, Plus
+  Navigation, Sparkles, Route as RouteIcon, Circle, Users, ThumbsUp, X, Plus, CalendarDays
 } from 'lucide-react-taro'
 import { Network } from '@/network'
 import Taro from '@tarojs/taro'
@@ -84,6 +86,8 @@ export default function Route() {
   const [voteSession, setVoteSession] = useState<{ shareCode: string; sessionId: string; voteDeadline: string } | null>(null)
   const [voteStats, setVoteStats] = useState<Record<string, { likes: number; dislikes: number }>>({})
   const [voteSettingVisible, setVoteSettingVisible] = useState(false)
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false)
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false)
   const getDefaultDateTime = (daysFromNow: number, hour: number = 9) => {
     const d = new Date(Date.now() + daysFromNow * 86400000)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00`
@@ -96,6 +100,30 @@ export default function Route() {
     meetupInput: '',
     voteDeadline: '',
   })
+
+  // 时间选项（每30分钟）
+  const timeOptions = Array.from({ length: 48 }, (_, i) => {
+    const hour = Math.floor(i / 2)
+    const minute = (i % 2) * 30
+    const value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+    return { value, label: value }
+  })
+
+  // 获取当前时间的索引
+  const getTimeIndex = (timeStr: string) => {
+    return timeOptions.findIndex(t => t.value === timeStr) || 0
+  }
+
+  // 解析日期时间
+  const parseDate = (dateTimeStr: string) => {
+    const [date, time] = dateTimeStr.split('T')
+    return { date: date || '', time: time || '09:00' }
+  }
+
+  // 合并日期和时间
+  const mergeDateTime = (date: string, time: string) => {
+    return `${date}T${time}`
+  }
 
   // 加载路线规划结果
   useEffect(() => {
@@ -610,62 +638,141 @@ export default function Route() {
               <View className="flex items-center gap-2">
                 <View className="flex-1">
                   <Text className="block text-xs text-gray-500 mb-1">出发日期</Text>
-                  <Input
-                    type="date"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                    value={voteSetting.startDate.split('T')[0]}
-                    onChange={(e: any) => setVoteSetting(prev => ({ 
-                      ...prev, 
-                      startDate: e.detail.value + 'T' + (prev.startDate.split('T')[1] || '09:00'),
-                    }))}
-                    placeholder="选择日期"
-                  />
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start h-10 border-gray-200"
+                    onClick={() => setShowStartDatePicker(true)}
+                  >
+                    <CalendarDays size={14} color="#64748B" className="mr-2" />
+                    <Text className="text-sm text-gray-700">
+                      {parseDate(voteSetting.startDate).date || '选择日期'}
+                    </Text>
+                  </Button>
                 </View>
-                <View className="w-16">
+                <View className="w-20">
                   <Text className="block text-xs text-gray-500 mb-1">时间</Text>
-                  <Input
-                    type="time"
-                    className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm text-center"
-                    value={voteSetting.startDate.split('T')[1]}
-                    onChange={(e: any) => setVoteSetting(prev => ({ 
-                      ...prev, 
-                      startDate: (prev.startDate.split('T')[0]) + 'T' + e.detail.value,
-                    }))}
-                    placeholder="时间"
-                  />
+                  <Picker
+                    mode="selector"
+                    range={timeOptions}
+                    rangeKey="label"
+                    value={getTimeIndex(parseDate(voteSetting.startDate).time)}
+                    onChange={(e: any) => {
+                      const newTime = timeOptions[e.detail.value].value
+                      setVoteSetting(prev => ({
+                        ...prev,
+                        startDate: mergeDateTime(parseDate(prev.startDate).date, newTime)
+                      }))
+                    }}
+                  >
+                    <View className="px-2 py-2 border border-gray-200 rounded-lg text-center bg-white">
+                      <Text className="text-sm text-gray-900">{parseDate(voteSetting.startDate).time}</Text>
+                    </View>
+                  </Picker>
                 </View>
               </View>
               <View className="flex items-center gap-2 mt-2">
                 <View className="flex-1">
                   <Text className="block text-xs text-gray-500 mb-1">返程日期</Text>
-                  <Input
-                    type="date"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                    value={voteSetting.endDate.split('T')[0]}
-                    min={voteSetting.startDate.split('T')[0]}
-                    onChange={(e: any) => setVoteSetting(prev => ({ 
-                      ...prev, 
-                      endDate: e.detail.value + 'T' + (prev.endDate.split('T')[1] || '18:00'),
-                    }))}
-                    placeholder="选择日期"
-                  />
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start h-10 border-gray-200"
+                    onClick={() => setShowEndDatePicker(true)}
+                  >
+                    <CalendarDays size={14} color="#64748B" className="mr-2" />
+                    <Text className="text-sm text-gray-700">
+                      {parseDate(voteSetting.endDate).date || '选择日期'}
+                    </Text>
+                  </Button>
                 </View>
-                <View className="w-16">
+                <View className="w-20">
                   <Text className="block text-xs text-gray-500 mb-1">时间</Text>
-                  <Input
-                    type="time"
-                    className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm text-center"
-                    value={voteSetting.endDate.split('T')[1]}
-                    onChange={(e: any) => setVoteSetting(prev => ({ 
-                      ...prev, 
-                      endDate: (prev.endDate.split('T')[0]) + 'T' + e.detail.value,
-                    }))}
-                    placeholder="时间"
-                  />
+                  <Picker
+                    mode="selector"
+                    range={timeOptions}
+                    rangeKey="label"
+                    value={getTimeIndex(parseDate(voteSetting.endDate).time)}
+                    onChange={(e: any) => {
+                      const newTime = timeOptions[e.detail.value].value
+                      setVoteSetting(prev => ({
+                        ...prev,
+                        endDate: mergeDateTime(parseDate(prev.endDate).date, newTime)
+                      }))
+                    }}
+                  >
+                    <View className="px-2 py-2 border border-gray-200 rounded-lg text-center bg-white">
+                      <Text className="text-sm text-gray-900">{parseDate(voteSetting.endDate).time}</Text>
+                    </View>
+                  </Picker>
                 </View>
               </View>
               <Text className="block text-xs text-gray-400 mt-1">允许同一天，只需返程时间晚于出发时间</Text>
             </View>
+
+            {/* 出发日期选择弹窗 */}
+            {showStartDatePicker && (
+              <View className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" onClick={() => setShowStartDatePicker(false)}>
+                <View className="bg-white rounded-xl p-4 mx-4 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                  <View className="flex justify-between items-center mb-4">
+                    <Text className="block text-base font-medium">选择出发日期</Text>
+                    <View onClick={() => setShowStartDatePicker(false)}>
+                      <X size={20} color="#64748B" />
+                    </View>
+                  </View>
+                  <Calendar
+                    mode="single"
+                    selected={new Date(parseDate(voteSetting.startDate).date || Date.now())}
+                    onSelect={(date) => {
+                      if (date) {
+                        const dateStr = format(date, 'yyyy-MM-dd')
+                        setVoteSetting(prev => ({
+                          ...prev,
+                          startDate: mergeDateTime(dateStr, parseDate(prev.startDate).time)
+                        }))
+                        setShowStartDatePicker(false)
+                      }
+                    }}
+                    disabled={(date) => date < new Date()}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* 返程日期选择弹窗 */}
+            {showEndDatePicker && (
+              <View className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" onClick={() => setShowEndDatePicker(false)}>
+                <View className="bg-white rounded-xl p-4 mx-4 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                  <View className="flex justify-between items-center mb-4">
+                    <Text className="block text-base font-medium">选择返程日期</Text>
+                    <View onClick={() => setShowEndDatePicker(false)}>
+                      <X size={20} color="#64748B" />
+                    </View>
+                  </View>
+                  <Calendar
+                    mode="single"
+                    selected={new Date(parseDate(voteSetting.endDate).date || Date.now())}
+                    onSelect={(date) => {
+                      if (date) {
+                        const dateStr = format(date, 'yyyy-MM-dd')
+                        // 允许选择出发日期或之后
+                        setVoteSetting(prev => ({
+                          ...prev,
+                          endDate: mergeDateTime(dateStr, parseDate(prev.endDate).time)
+                        }))
+                        setShowEndDatePicker(false)
+                      }
+                    }}
+                    disabled={(date) => {
+                      const startDateStr = parseDate(voteSetting.startDate).date
+                      if (startDateStr) {
+                        const start = new Date(startDateStr)
+                        return date < start
+                      }
+                      return false
+                    }}
+                  />
+                </View>
+              </View>
+            )}
 
             {/* 集合地点 */}
             <View className="mb-4">

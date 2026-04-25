@@ -58,7 +58,10 @@ const Input = React.forwardRef<any, InputProps>(
     // 添加 min 支持
     if (min) {
       inputProps.min = min
+      console.log('[Input] min prop:', min, 'type:', type)
     }
+
+    console.log('[Input] rendering with min:', min, 'value:', value)
 
     return (
       <View
