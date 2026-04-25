@@ -424,8 +424,9 @@ const SelectPage = () => {
                   <SelectItem value="全部">🏠 全部</SelectItem>
                   <SelectItem value="景点">🏛️ 景点</SelectItem>
                   <SelectItem value="美食">🍜 美食</SelectItem>
+                  <SelectItem value="演出">🎭 演出</SelectItem>
+                  <SelectItem value="活动">🎪 活动</SelectItem>
                   <SelectItem value="购物">🛍️ 购物</SelectItem>
-                  <SelectItem value="活动">🎭 活动</SelectItem>
                 </SelectContent>
               </Select>
             </View>
