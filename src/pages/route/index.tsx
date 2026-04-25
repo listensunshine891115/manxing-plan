@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image } from '@tarojs/components'
+import { View, Text, Image, Picker } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -86,27 +86,9 @@ export default function Route() {
   const [voteSettingVisible, setVoteSettingVisible] = useState(false)
   
   // 获取北京时间日期字符串 (格式: YYYY-MM-DD)
-  const getBeijingDateStr = (date: Date = new Date()) => {
-    const beijingOffset = 8 * 60 * 60 * 1000
-    const beijingTime = new Date(date.getTime() + beijingOffset)
-    return `${beijingTime.getUTCFullYear()}-${String(beijingTime.getUTCMonth() + 1).padStart(2, '0')}-${String(beijingTime.getUTCDate()).padStart(2, '0')}`
-  }
-  
-  // 解析日期时间字符串
-  const parseDateTime = (dateTimeStr: string) => {
-    if (!dateTimeStr) return { date: getBeijingDateStr(), time: '09:00' }
-    const [date, time] = dateTimeStr.split('T')
-    return { date: date || getBeijingDateStr(), time: time || '09:00' }
-  }
-  
-  // 合并日期和时间
-  const mergeDateTime = (date: string, time: string) => {
-    return `${date}T${time}`
-  }
-  
   const [voteSetting, setVoteSetting] = useState({
-    startDate: getBeijingDateStr() + 'T09:00',
-    endDate: getBeijingDateStr() + 'T18:00',
+    startDate: '',
+    endDate: '',
     meetupPlace: [] as string[],
     meetupInput: '',
     voteDeadline: '',
@@ -189,19 +171,18 @@ export default function Route() {
       return
     }
 
-    // 初始化投票设置（使用北京时间）
-    const defaultDeadline = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3天后
-    const formatBeijingDateTime = (d: Date) => {
-      const beijingOffset = 8 * 60 * 60 * 1000
-      const beijingTime = new Date(d.getTime() + beijingOffset)
-      return `${beijingTime.getUTCFullYear()}-${String(beijingTime.getUTCMonth() + 1).padStart(2, '0')}-${String(beijingTime.getUTCDate()).padStart(2, '0')}T${String(beijingTime.getUTCHours()).padStart(2, '0')}:${String(beijingTime.getUTCMinutes()).padStart(2, '0')}`
-    }
+    // 初始化投票设置
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    const threeDaysLater = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+    const deadlineStr = `${threeDaysLater.getFullYear()}-${String(threeDaysLater.getMonth() + 1).padStart(2, '0')}-${String(threeDaysLater.getDate()).padStart(2, '0')}T23:59`
+    
     setVoteSetting({
-      startDate: getBeijingDateStr() + 'T09:00',
-      endDate: getBeijingDateStr() + 'T18:00',
+      startDate: todayStr + 'T09:00',
+      endDate: todayStr + 'T18:00',
       meetupPlace: [],
       meetupInput: '',
-      voteDeadline: formatBeijingDateTime(defaultDeadline),
+      voteDeadline: deadlineStr,
     })
     setVoteSettingVisible(true)
   }
@@ -621,95 +602,100 @@ export default function Route() {
           <View className="p-4">
             <Text className="block text-lg font-semibold text-gray-800 mb-4">投票设置</Text>
 
-            {/* 旅行日期 */}
+            {/* 旅行日期 - 重新设计 */}
             <View className="mb-4">
               <Text className="block text-sm font-medium text-gray-700 mb-2">旅行日期</Text>
-              <View className="flex items-center gap-2">
-                <View className="flex-1">
-                  <Text className="block text-xs text-gray-500 mb-1">出发日期</Text>
-                  <View className="border border-gray-200 rounded-lg overflow-hidden">
-                    <Input
-                      type="date"
-                      className="w-full px-3 py-2 bg-white text-sm"
-                      value={parseDateTime(voteSetting.startDate).date}
-                      onInput={(e: any) => {
-                        const newDate = e.detail.value
-                        if (newDate) {
+              <View className="bg-gray-50 rounded-xl p-4">
+                {/* 出发日期时间 */}
+                <View className="mb-3">
+                  <Text className="block text-xs text-gray-500 mb-2">出发时间</Text>
+                  <View className="flex items-center gap-2">
+                    <View className="flex-1">
+                      <Picker
+                        mode="date"
+                        value={voteSetting.startDate.split('T')[0] || ''}
+                        onChange={(e: any) => {
+                          const newDate = e.detail.value
                           setVoteSetting(prev => ({
                             ...prev,
-                            startDate: mergeDateTime(newDate, parseDateTime(prev.startDate).time)
+                            startDate: newDate + 'T' + (prev.startDate.split('T')[1] || '09:00')
                           }))
-                        }
-                      }}
-                      placeholder="选择日期"
-                    />
-                  </View>
-                </View>
-                <View className="w-20">
-                  <Text className="block text-xs text-gray-500 mb-1">时间</Text>
-                  <View className="border border-gray-200 rounded-lg overflow-hidden">
-                    <Input
-                      type="time"
-                      className="w-full px-2 py-2 bg-white text-sm text-center"
-                      value={parseDateTime(voteSetting.startDate).time}
-                      onInput={(e: any) => {
+                        }}
+                      >
+                        <View className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center">
+                          <Text className="text-sm text-gray-900 flex-1">
+                            {voteSetting.startDate.split('T')[0] || '选择日期'}
+                          </Text>
+                          <Text className="text-xs text-gray-400">▼</Text>
+                        </View>
+                      </Picker>
+                    </View>
+                    <Picker
+                      mode="time"
+                      value={voteSetting.startDate.split('T')[1] || '09:00'}
+                      onChange={(e: any) => {
                         const newTime = e.detail.value
-                        if (newTime) {
-                          setVoteSetting(prev => ({
-                            ...prev,
-                            startDate: mergeDateTime(parseDateTime(prev.startDate).date, newTime)
-                          }))
-                        }
+                        setVoteSetting(prev => ({
+                          ...prev,
+                          startDate: prev.startDate.split('T')[0] + 'T' + newTime
+                        }))
                       }}
-                      placeholder="时间"
-                    />
+                    >
+                      <View className="w-20 bg-white border border-gray-200 rounded-lg px-2 py-2 text-center">
+                        <Text className="text-sm text-gray-900">
+                          {voteSetting.startDate.split('T')[1]?.slice(0, 5) || '09:00'}
+                        </Text>
+                      </View>
+                    </Picker>
                   </View>
                 </View>
-              </View>
-              <View className="flex items-center gap-2 mt-2">
-                <View className="flex-1">
-                  <Text className="block text-xs text-gray-500 mb-1">返程日期</Text>
-                  <View className="border border-gray-200 rounded-lg overflow-hidden">
-                    <Input
-                      type="date"
-                      className="w-full px-3 py-2 bg-white text-sm"
-                      value={parseDateTime(voteSetting.endDate).date}
-                      onInput={(e: any) => {
-                        const newDate = e.detail.value
-                        if (newDate) {
+                
+                {/* 返程日期时间 */}
+                <View>
+                  <Text className="block text-xs text-gray-500 mb-2">返程时间</Text>
+                  <View className="flex items-center gap-2">
+                    <View className="flex-1">
+                      <Picker
+                        mode="date"
+                        value={voteSetting.endDate.split('T')[0] || ''}
+                        onChange={(e: any) => {
+                          const newDate = e.detail.value
                           setVoteSetting(prev => ({
                             ...prev,
-                            endDate: mergeDateTime(newDate, parseDateTime(prev.endDate).time)
+                            endDate: newDate + 'T' + (prev.endDate.split('T')[1] || '18:00')
                           }))
-                        }
-                      }}
-                      min={parseDateTime(voteSetting.startDate).date}
-                      placeholder="选择日期"
-                    />
-                  </View>
-                </View>
-                <View className="w-20">
-                  <Text className="block text-xs text-gray-500 mb-1">时间</Text>
-                  <View className="border border-gray-200 rounded-lg overflow-hidden">
-                    <Input
-                      type="time"
-                      className="w-full px-2 py-2 bg-white text-sm text-center"
-                      value={parseDateTime(voteSetting.endDate).time}
-                      onInput={(e: any) => {
+                        }}
+                      >
+                        <View className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center">
+                          <Text className="text-sm text-gray-900 flex-1">
+                            {voteSetting.endDate.split('T')[0] || '选择日期'}
+                          </Text>
+                          <Text className="text-xs text-gray-400">▼</Text>
+                        </View>
+                      </Picker>
+                    </View>
+                    <Picker
+                      mode="time"
+                      value={voteSetting.endDate.split('T')[1] || '18:00'}
+                      onChange={(e: any) => {
                         const newTime = e.detail.value
-                        if (newTime) {
-                          setVoteSetting(prev => ({
-                            ...prev,
-                            endDate: mergeDateTime(parseDateTime(prev.endDate).date, newTime)
-                          }))
-                        }
+                        setVoteSetting(prev => ({
+                          ...prev,
+                          endDate: prev.endDate.split('T')[0] + 'T' + newTime
+                        }))
                       }}
-                      placeholder="时间"
-                    />
+                    >
+                      <View className="w-20 bg-white border border-gray-200 rounded-lg px-2 py-2 text-center">
+                        <Text className="text-sm text-gray-900">
+                          {voteSetting.endDate.split('T')[1]?.slice(0, 5) || '18:00'}
+                        </Text>
+                      </View>
+                    </Picker>
                   </View>
                 </View>
+                
+                <Text className="block text-xs text-gray-400 mt-2">允许同一天，只需返程时间晚于出发时间</Text>
               </View>
-              <Text className="block text-xs text-gray-400 mt-1">允许同一天，只需返程时间晚于出发时间</Text>
             </View>
 
             {/* 集合地点 */}
