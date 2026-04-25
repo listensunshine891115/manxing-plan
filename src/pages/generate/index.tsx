@@ -212,32 +212,36 @@ export default function Generate() {
     setSearchResults([])
   }
 
-  // 从地图选择地点
-  const chooseFromMap = async () => {
-    try {
-      await Taro.chooseLocation({
-        success: (result) => {
-          if (result && result.name) {
-            setMeetingPoint(result.name)
-            setMeetingCoords({ 
-              lat: result.latitude, 
-              lng: result.longitude 
-            })
-            setInputValue('')
-            setShowSearch(false)
-            setSearchResults([])
-          }
-        },
-        fail: (err) => {
-          console.log('[Generate] 选择地图失败:', err)
-          if (err.errMsg && !err.errMsg.includes('cancel')) {
-            Taro.showToast({ title: '请在地图上选择地点', icon: 'none' })
-          }
+  // 从外部地图选择地点（获取当前位置作为参考）
+  const openExternalMap = () => {
+    Taro.showModal({
+      title: '选择集合地点',
+      content: '您可以：\n1. 在上方输入框搜索地点名称\n2. 或点击"定位"获取当前位置\n\n如需使用高德/百度地图，请在地图应用中复制地点名称后粘贴至此。',
+      confirmText: '获取定位',
+      cancelText: '知道了',
+      success: async (res) => {
+        if (res.confirm) {
+          // 获取当前位置
+          Taro.getLocation({
+            type: 'gcj02',
+            success: (locationRes) => {
+              const { latitude, longitude } = locationRes
+              // 逆地理编码获取地址（需要后端支持或使用第三方API）
+              Taro.showToast({ 
+                title: `已获取位置\n经度:${longitude.toFixed(2)}\n纬度:${latitude.toFixed(2)}`, 
+                icon: 'none',
+                duration: 2000
+              })
+              // 保存坐标
+              setMeetingCoords({ lat: latitude, lng: longitude })
+            },
+            fail: () => {
+              Taro.showToast({ title: '定位失败，请检查权限', icon: 'none' })
+            }
+          })
         }
-      })
-    } catch (error) {
-      console.log('[Generate] chooseLocation error:', error)
-    }
+      }
+    })
   }
 
   // 清除集合地点
@@ -633,7 +637,7 @@ export default function Generate() {
                 <View className="flex items-center gap-2 ml-2">
                   <View 
                     className="px-2 py-1 rounded text-xs text-blue-500 border border-blue-200 bg-blue-50"
-                    onClick={chooseFromMap}
+                    onClick={openExternalMap}
                   >
                     地图
                   </View>
