@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { getSupabaseClient } from '@/storage/database/supabase-client'
+import { MapService } from '@/map.service'
 
 // 类型定义
 interface InspirationInput {
@@ -38,6 +39,8 @@ export class TripService {
   private get client() {
     return getSupabaseClient()
   }
+
+  constructor(private readonly mapService: MapService) {}
 
   // ==================== 灵感管理 ====================
 
@@ -375,7 +378,7 @@ export class TripService {
     return R * c
   }
 
-  // 基于地理位置的智能路线规划
+  // 基于地理位置的智能路线规划（使用实际道路距离）
   async planRouteByLocation(
     inspirations: Array<{
       id: string
@@ -475,21 +478,25 @@ export class TripService {
     for (const cluster of clusters) {
       if (cluster.length === 0) continue
 
-      // 按最近邻排序
-      const sorted = this.nearestNeighborSort(cluster)
+      // 按最近邻排序（使用道路距离）
+      const sorted = await this.nearestNeighborSort(cluster)
 
       for (let i = 0; i < sorted.length; i++) {
         const point = sorted[i]
         if (i < sorted.length - 1) {
-          const distance = this.calculateDistance(point.location, sorted[i + 1].location)
-          point.distance = Math.round(distance * 10) / 10
+          // 使用道路距离计算（返回米，转换为公里）
+          const distanceMeters = await this.mapService.getDrivingDistance(
+            { lat: point.location.lat, lng: point.location.lng },
+            { lat: sorted[i + 1].location.lat, lng: sorted[i + 1].location.lng }
+          )
+          point.distance = Math.round(distanceMeters / 100) / 10 // 转换为公里，保留1位小数
           totalDistance += point.distance
         }
         optimizedRoute.push(point)
       }
     }
 
-    console.log(`[TripService] 路线规划完成，总距离: ${totalDistance.toFixed(2)}km`)
+    console.log(`[TripService] 路线规划完成，总距离: ${totalDistance.toFixed(1)}km`)
 
     return {
       optimizedRoute,
@@ -539,9 +546,10 @@ export class TripService {
   }
 
   // 最近邻排序算法
-  private nearestNeighborSort<T extends { location: { lat: number; lng: number } }>(
+  // 按最近邻算法排序（使用道路距离）
+  private async nearestNeighborSort<T extends { location: { lat: number; lng: number } }>(
     points: T[]
-  ): T[] {
+  ): Promise<T[]> {
     if (points.length <= 1) return [...points]
 
     const route: T[] = []
@@ -558,10 +566,16 @@ export class TripService {
       let nearestIndex = 0
       let nearestDist = Infinity
 
+      // 使用道路距离计算
       for (let i = 0; i < remaining.length; i++) {
-        const dist = this.calculateDistance(current.location, remaining[i].location)
-        if (dist < nearestDist) {
-          nearestDist = dist
+        const dist = await this.mapService.getDrivingDistance(
+          { lat: current.location.lat, lng: current.location.lng },
+          { lat: remaining[i].location.lat, lng: remaining[i].location.lng }
+        )
+        // 转换为公里便于比较
+        const distKm = dist / 1000
+        if (distKm < nearestDist) {
+          nearestDist = distKm
           nearestIndex = i
         }
       }

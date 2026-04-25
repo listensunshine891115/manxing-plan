@@ -9,6 +9,7 @@ import { UserService } from '@/user.service'
 import { AsrService } from '@/asr.service'
 import { AudioService } from '@/audio.service'
 import { VideoParseService } from '@/video-parse.service'
+import { MapService } from '@/map.service'
 
 @Module({
   imports: [],
@@ -21,6 +22,7 @@ import { VideoParseService } from '@/video-parse.service'
     AsrService,
     AudioService,
     VideoParseService,
+    MapService,
   ],
 })
 export class AppModule {}
