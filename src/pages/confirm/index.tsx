@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Text } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Check, CalendarDays, MapPin, Loader } from 'lucide-react-taro'
+import { ArrowLeft, CalendarDays, MapPin, Loader, Users, Clock, Car, Bus } from 'lucide-react-taro'
 import Taro from '@tarojs/taro'
 import { Network } from '@/network'
 import './index.css'
@@ -48,6 +48,13 @@ interface RoutePlanResult {
     days: number
     startDate: string
     mainDestination?: string
+    // 集合地点信息
+    meetingPoint?: string
+    meetingCoords?: { lat: number; lng: number }
+    meetingSource?: 'none' | 'text' | 'map'
+    startTime?: string
+    endTime?: string
+    transportMode?: 'public' | 'self-drive'
   }
 }
 
@@ -84,7 +91,7 @@ export default function Confirm() {
     }
   }
 
-  // 确认行程
+  // 确认并分享投票
   const handleConfirm = async () => {
     if (!routePlan) return
 
@@ -93,6 +100,7 @@ export default function Confirm() {
       // 获取用户信息
       const userInfo = Taro.getStorageSync('userInfo')
       const userId = userInfo?.id
+      const userName = userInfo?.nickname || userInfo?.name || '匿名用户'
 
       // 调用后端 API 保存行程
       const res = await Network.request({
@@ -117,15 +125,59 @@ export default function Confirm() {
       console.log('[POST] /api/trip/trips - Response:', res.data)
 
       if (res.data && res.data.code === 200) {
-        // 清除缓存
-        await Taro.removeStorage({ key: 'routePlanResult' })
+        const tripId = res.data.data?.id
         
-        Taro.showToast({ title: '保存成功', icon: 'success' })
-        
-        // 延迟跳转，让用户看到成功提示
-        setTimeout(() => {
-          Taro.switchTab({ url: '/pages/preview/index' })
-        }, 1500)
+        // 构建集合地点标签数组
+        const meetupPlaces: string[] = []
+        if (routePlan.settings.meetingPoint) {
+          if (routePlan.settings.meetingCoords) {
+            // 有坐标的地点标签：名称|lat|lng
+            meetupPlaces.push(`${routePlan.settings.meetingPoint}|${routePlan.settings.meetingCoords.lat}|${routePlan.settings.meetingCoords.lng}`)
+          } else {
+            // 无坐标的地点标签：仅名称
+            meetupPlaces.push(routePlan.settings.meetingPoint)
+          }
+        }
+
+        // 创建投票会话
+        const inspirationPoints = routePlan.itinerary.flatMap(day => 
+          day.items.map(item => ({
+            id: item.inspirationId || item.id,
+            title: item.title,
+            image: item.image,
+            location: item.location?.name ? { name: item.location.name } : undefined,
+            type: item.type
+          }))
+        )
+
+        const voteRes = await Network.request({
+          url: '/api/vote/sessions',
+          method: 'POST',
+          data: {
+            tripId: tripId,
+            title: `旅行投票-${routePlan.settings.startDate}`,
+            creatorName: userName,
+            inspirationPoints: inspirationPoints,
+            startDate: routePlan.settings.startDate,
+            endDate: routePlan.settings.days > 1 ? routePlan.settings.startDate : undefined,
+            meetupPlace: meetupPlaces.length > 0 ? meetupPlaces : undefined
+          }
+        })
+
+        console.log('[POST] /api/vote/sessions - Response:', voteRes.data)
+
+        if (voteRes.data && voteRes.data.code === 200) {
+          const shareCode = voteRes.data.data?.shareCode
+          
+          Taro.showToast({ title: '保存成功', icon: 'success' })
+          
+          // 延迟跳转，让用户看到成功提示，然后跳转到投票页面
+          setTimeout(() => {
+            Taro.navigateTo({ url: `/pages/vote/index?code=${shareCode}` })
+          }, 1500)
+        } else {
+          throw new Error(voteRes.data?.msg || '创建投票会话失败')
+        }
       } else {
         throw new Error(res.data?.msg || '保存失败')
       }
@@ -207,8 +259,66 @@ export default function Confirm() {
               {totalDays > 1 && ` - 共${totalDays}天`}
             </Text>
           </View>
+
+          {/* 出发时间 */}
+          {routePlan.settings.startTime && (
+            <View className="flex items-center mt-2">
+              <Clock size={16} color="#64748b" />
+              <Text className="block text-sm text-gray-600 ml-2">
+                出发时间: {routePlan.settings.startTime}
+                {routePlan.settings.endTime && ` - 返程: ${routePlan.settings.endTime}`}
+              </Text>
+            </View>
+          )}
+
+          {/* 交通方式 */}
+          {routePlan.settings.transportMode && (
+            <View className="flex items-center mt-2">
+              {routePlan.settings.transportMode === 'public' ? (
+                <Bus size={16} color="#64748b" />
+              ) : (
+                <Car size={16} color="#64748b" />
+              )}
+              <Text className="block text-sm text-gray-600 ml-2">
+                交通方式: {routePlan.settings.transportMode === 'public' ? '公共交通' : '自驾'}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
+
+      {/* 集合地点 */}
+      {routePlan.settings.meetingPoint && (
+        <View className="px-4 py-2">
+          <View className="bg-green-50 rounded-2xl p-4 border border-green-200">
+            <View className="flex items-center mb-2">
+              <Users size={18} color="#10b981" />
+              <Text className="block text-base font-medium text-green-700 ml-2">集合地点</Text>
+              {routePlan.settings.meetingSource === 'map' && (
+                <View className="ml-2 px-2 py-1 rounded text-xs text-blue-600 bg-blue-50 border border-blue-200">
+                  已定位
+                </View>
+              )}
+              {routePlan.settings.meetingSource === 'text' && (
+                <View className="ml-2 px-2 py-1 rounded text-xs text-gray-600 bg-gray-100 border border-gray-200">
+                  文字
+                </View>
+              )}
+            </View>
+            <View className="flex items-center">
+              <MapPin size={16} color="#10b981" />
+              <Text className="block text-sm text-green-700 ml-2 flex-1">
+                {routePlan.settings.meetingPoint}
+              </Text>
+            </View>
+            {routePlan.settings.meetingCoords && (
+              <Text className="block text-xs text-gray-500 mt-1 ml-6">
+                坐标: ({routePlan.settings.meetingCoords.lat.toFixed(4)}, {routePlan.settings.meetingCoords.lng.toFixed(4)})
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* 每日行程预览 */}
       <View className="px-4 space-y-4">
@@ -265,6 +375,7 @@ export default function Confirm() {
       </View>
 
       {/* 底部确认按钮 */}
+      {/* 底部按钮 */}
       <View 
         style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
@@ -280,12 +391,12 @@ export default function Confirm() {
           {confirming ? (
             <>
               <Loader size={18} color="#ffffff" className="mr-2 animate-spin" />
-              <Text className="text-white">确认中...</Text>
+              <Text className="text-white">保存中...</Text>
             </>
           ) : (
             <>
-              <Check size={18} color="#ffffff" className="mr-2" />
-              <Text className="text-white">确认行程</Text>
+              <Users size={18} color="#ffffff" className="mr-2" />
+              <Text className="text-white">分享投票邀请</Text>
             </>
           )}
         </Button>

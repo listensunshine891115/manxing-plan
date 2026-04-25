@@ -67,6 +67,13 @@ interface RoutePlanResult {
     days: number
     startDate: string
     mainDestination?: string
+    // 集合地点信息
+    meetingPoint?: string
+    meetingCoords?: { lat: number; lng: number }
+    meetingSource?: 'none' | 'text' | 'map'
+    startTime?: string
+    endTime?: string
+    transportMode?: 'public' | 'self-drive'
   }
 }
 
@@ -335,9 +342,13 @@ export default function Generate() {
       if (res.data && res.data.code === 200 && res.data.data) {
         const result: RoutePlanResult = res.data.data
 
-        if (meetingCoords) {
-          result.settings.mainDestination = meetingPoint
-        }
+        // 保存集合地点信息（无论是否有坐标都保存）
+        result.settings.meetingPoint = meetingPoint
+        result.settings.meetingCoords = meetingCoords || undefined
+        result.settings.meetingSource = meetingSource
+        result.settings.startTime = startTime
+        result.settings.endTime = endTime
+        result.settings.transportMode = transportMode
 
         await Taro.setStorage({ key: 'routePlanResult', data: result })
         Taro.navigateTo({ url: '/pages/confirm/index' })
