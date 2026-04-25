@@ -213,35 +213,38 @@ export default function Generate() {
   }
 
   // 从外部地图选择地点（获取当前位置作为参考）
-  const openExternalMap = () => {
-    Taro.showModal({
-      title: '选择集合地点',
-      content: '您可以：\n1. 在上方输入框搜索地点名称\n2. 或点击"定位"获取当前位置\n\n如需使用高德/百度地图，请在地图应用中复制地点名称后粘贴至此。',
-      confirmText: '获取定位',
-      cancelText: '知道了',
-      success: async (res) => {
-        if (res.confirm) {
-          // 获取当前位置
-          Taro.getLocation({
-            type: 'gcj02',
-            success: (locationRes) => {
-              const { latitude, longitude } = locationRes
-              // 逆地理编码获取地址（需要后端支持或使用第三方API）
-              Taro.showToast({ 
-                title: `已获取位置\n经度:${longitude.toFixed(2)}\n纬度:${latitude.toFixed(2)}`, 
-                icon: 'none',
-                duration: 2000
-              })
-              // 保存坐标
-              setMeetingCoords({ lat: latitude, lng: longitude })
-            },
-            fail: () => {
-              Taro.showToast({ title: '定位失败，请检查权限', icon: 'none' })
-            }
-          })
-        }
+  const openExternalMap = async () => {
+    // 直接获取定位
+    try {
+      const res = await Taro.getLocation({
+        type: 'gcj02'
+      })
+      const { latitude, longitude } = res
+      // 保存坐标
+      setMeetingCoords({ lat: latitude, lng: longitude })
+      Taro.showToast({ 
+        title: '已获取当前位置坐标', 
+        icon: 'success',
+        duration: 1500
+      })
+    } catch (err) {
+      console.log('[Generate] getLocation error:', err)
+      // 检查是否是授权问题
+      if (err.errMsg && err.errMsg.includes('auth deny')) {
+        Taro.showModal({
+          title: '定位失败',
+          content: '请在小程序设置中开启位置权限：\n我 → 设置 → 通用 → 功能 → 位置服务',
+          showCancel: false,
+          confirmText: '知道了'
+        })
+      } else {
+        Taro.showToast({ 
+          title: '定位失败，请检查网络', 
+          icon: 'none',
+          duration: 2000
+        })
       }
-    })
+    }
   }
 
   // 清除集合地点
