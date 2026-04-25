@@ -607,7 +607,12 @@ export default function Route() {
                     type="date"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
                     value={voteSetting.startDate}
-                    onInput={(e: any) => setVoteSetting(prev => ({ ...prev, startDate: e.detail.value }))}
+                    onInput={(e: any) => setVoteSetting(prev => ({ 
+                      ...prev, 
+                      startDate: e.detail.value,
+                      // 如果结束日期比新的起始日期早，则更新结束日期
+                      endDate: prev.endDate && prev.endDate < e.detail.value ? e.detail.value : prev.endDate
+                    }))}
                     placeholder="选择日期"
                   />
                 </View>
@@ -618,11 +623,13 @@ export default function Route() {
                     type="date"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
                     value={voteSetting.endDate}
+                    min={voteSetting.startDate || undefined}
                     onInput={(e: any) => setVoteSetting(prev => ({ ...prev, endDate: e.detail.value }))}
                     placeholder="选择日期"
                   />
                 </View>
               </View>
+              <Text className="block text-xs text-gray-400 mt-1">起始和结束日期可以是同一天（一日游）</Text>
             </View>
 
             {/* 集合地点 */}

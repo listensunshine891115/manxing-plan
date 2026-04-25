@@ -7,6 +7,7 @@ export interface InputProps
   className?: string
   type?: any
   autoFocus?: boolean
+  min?: string
 }
 
 const Input = React.forwardRef<React.ElementRef<typeof TaroInput>, InputProps>(
