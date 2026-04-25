@@ -167,7 +167,7 @@ export class TripService {
 
   // ==================== 行程管理 ====================
 
-  // 获取行程列表
+  // 获取行程列表（包含投票信息）
   async getTrips(userId?: string) {
     let query = this.client.from('trips').select('*')
     if (userId) {
@@ -175,6 +175,29 @@ export class TripService {
     }
     const { data, error } = await query.order('create_time', { ascending: false })
     if (error) throw new Error(`获取行程失败: ${error.message}`)
+
+    // 查询每个行程关联的投票信息
+    if (data && data.length > 0) {
+      const tripIds = data.map(t => t.id)
+      const { data: voteSessions } = await this.client
+        .from('vote_sessions')
+        .select('id, trip_id, title, share_code, vote_deadline, create_time')
+        .in('trip_id', tripIds)
+
+      // 将投票信息附加到每个行程
+      const voteMap = new Map()
+      if (voteSessions) {
+        voteSessions.forEach(vs => {
+          voteMap.set(vs.trip_id, vs)
+        })
+      }
+
+      return data.map(trip => ({
+        ...trip,
+        voteSession: voteMap.get(trip.id) || null
+      }))
+    }
+
     return data
   }
 

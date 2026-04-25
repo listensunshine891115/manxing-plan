@@ -49,12 +49,18 @@ export default function VotePage() {
   const [error, setError] = useState('')
   const [shareCode, setShareCode] = useState('')
   const [showResults, setShowResults] = useState(false)
+  const [isCreator, setIsCreator] = useState(false)
 
-  // 获取分享码
+  // 获取分享码和来源
   useEffect(() => {
     const params = Taro.getCurrentInstance().router?.params
     if (params?.code) {
       setShareCode(params.code)
+      // 如果是从"我的行程"进入，显示结果面板
+      if (params.from === 'mine') {
+        setIsCreator(true)
+        setShowResults(true)
+      }
       loadSession(params.code)
     } else {
       setError('缺少分享码')
@@ -499,37 +505,62 @@ export default function VotePage() {
           padding: '16px', paddingBottom: '32px', zIndex: 100
         }}
       >
-        {/* 分享给好友按钮 */}
-        <View className="mx-4 mb-3">
-          <Button
-            className="w-full py-3 rounded-xl bg-green-500 text-white font-medium"
-            onClick={handleShare}
-          >
-            <Share2 size={18} color="#ffffff" className="mr-2" />
-            <Text className="text-white">分享给微信好友邀请投票</Text>
-          </Button>
-        </View>
-        
-        {/* 提交投票按钮 */}
-        {!submitted && !session?.isExpired && (
-          <View className="mx-4">
-            <Text className="block text-sm text-gray-500 text-center mb-2">
-              已投票 {votedCount}/{totalCount} 个灵感点
-            </Text>
+        {/* 发起者视角 - 显示投票统计和邀请按钮 */}
+        {isCreator ? (
+          <View>
+            <View className="mx-4 mb-3 p-3 bg-blue-50 rounded-xl">
+              <Text className="block text-sm text-blue-700 text-center">
+                已投票 {votedCount}/{totalCount} 个地点
+              </Text>
+              {session?.isExpired && (
+                <Text className="block text-xs text-orange-500 text-center mt-1">
+                  投票已截止
+                </Text>
+              )}
+            </View>
             <Button
-              className={`w-full py-3 rounded-xl text-white font-medium ${
-                submitting || votedCount === 0 ? 'bg-gray-300' : 'bg-blue-500'
-              }`}
-              disabled={submitting || votedCount === 0}
-              onClick={handleSubmit}
+              className="w-full py-3 rounded-xl bg-green-500 text-white font-medium"
+              onClick={handleShare}
             >
-              <Text className="text-white">{submitting ? '提交中...' : '提交投票'}</Text>
+              <Share2 size={18} color="#ffffff" className="mr-2" />
+              <Text className="text-white">邀请更多好友投票</Text>
             </Button>
           </View>
+        ) : (
+          <>
+            {/* 分享给好友按钮 */}
+            <View className="mx-4 mb-3">
+              <Button
+                className="w-full py-3 rounded-xl bg-green-500 text-white font-medium"
+                onClick={handleShare}
+              >
+                <Share2 size={18} color="#ffffff" className="mr-2" />
+                <Text className="text-white">分享给微信好友邀请投票</Text>
+              </Button>
+            </View>
+            
+            {/* 提交投票按钮 */}
+            {!submitted && !session?.isExpired && (
+              <View className="mx-4">
+                <Text className="block text-sm text-gray-500 text-center mb-2">
+                  已投票 {votedCount}/{totalCount} 个灵感点
+                </Text>
+                <Button
+                  className={`w-full py-3 rounded-xl text-white font-medium ${
+                    submitting || votedCount === 0 ? 'bg-gray-300' : 'bg-blue-500'
+                  }`}
+                  disabled={submitting || votedCount === 0}
+                  onClick={handleSubmit}
+                >
+                  <Text className="text-white">{submitting ? '提交中...' : '提交投票'}</Text>
+                </Button>
+              </View>
+            )}
+            <Text className="block text-xs text-gray-400 text-center mt-2">
+              {submitted ? '已提交，等待结果...' : session?.isExpired ? '投票已截止' : '提交后无法修改'}
+            </Text>
+          </>
         )}
-        <Text className="block text-xs text-gray-400 text-center mt-2">
-          提交后无法修改
-        </Text>
       </View>
     </View>
   )

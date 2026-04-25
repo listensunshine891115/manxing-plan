@@ -537,7 +537,13 @@ export default function Index() {
                 className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100"
                 onClick={() => {
                   Taro.setStorage({ key: 'currentTrip', data: trip })
-                  Taro.navigateTo({ url: '/pages/confirm/index' })
+                  // 如果有投票会话，跳转到投票结果页面
+                  if (trip.voteSession?.share_code) {
+                    Taro.navigateTo({ url: `/pages/vote/index?code=${trip.voteSession.share_code}&from=mine` })
+                  } else {
+                    // 否则跳转到行程概览页面
+                    Taro.navigateTo({ url: '/pages/preview/index' })
+                  }
                 }}
               >
                 <View className="flex items-center justify-between">
@@ -546,6 +552,11 @@ export default function Index() {
                     <Text className="block text-sm font-medium text-gray-900 ml-2">
                       {trip.version_name || '我的行程'}
                     </Text>
+                    {trip.voteSession && (
+                      <View className="ml-2 px-2 rounded text-xs bg-orange-100 text-orange-600 border border-orange-200" style={{ paddingTop: 2, paddingBottom: 2 }}>
+                        投票中
+                      </View>
+                    )}
                   </View>
                   <View className="flex items-center text-xs text-gray-500">
                     <Clock size={12} color="#9ca3af" />
@@ -557,6 +568,11 @@ export default function Index() {
                 {trip.settings?.startDate && (
                   <Text className="block text-xs text-gray-500 mt-1 ml-5">
                     {trip.settings.startDate}
+                  </Text>
+                )}
+                {trip.voteSession?.share_code && (
+                  <Text className="block text-xs text-orange-600 mt-1 ml-5">
+                    点击查看投票结果
                   </Text>
                 )}
               </View>
