@@ -671,7 +671,7 @@ export default function Route() {
                     <Picker
                       mode="date"
                       value={parseDate(voteSetting.endDate).date || format(new Date(), 'yyyy-MM-dd')}
-                      start={parseDate(voteSetting.startDate).date || format(new Date(), 'yyyy-MM-dd')}
+                      start={`${parseDate(voteSetting.startDate).date}T00:00:00`}
                       onChange={(e: any) => {
                         const newDate = e.detail.value
                         setVoteSetting(prev => ({
