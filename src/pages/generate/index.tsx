@@ -95,6 +95,26 @@ export default function Generate() {
     return { value, label: value }
   })
 
+  // 返程时间选项：根据出发时间和结束日期动态计算
+  const getReturnTimeOptions = () => {
+    // 如果是同一天，返程时间必须晚于集合时间
+    if (startDate && endDate && differenceInDays(endDate, startDate) === 0) {
+      const startIndex = timeOptions.findIndex(t => t.value === startTime)
+      return timeOptions.slice(startIndex + 1)
+    }
+    // 不同日期，返程时间可以任意选择
+    return timeOptions
+  }
+  const returnTimeOptions = getReturnTimeOptions()
+
+  // 确保返程时间在有效范围内
+  useEffect(() => {
+    if (returnTimeOptions.length > 0) {
+      const validTime = returnTimeOptions.find(t => t.value === endTime) || returnTimeOptions[0]
+      setEndTime(validTime.value)
+    }
+  }, [startDate, startTime, endDate])
+
   // 集合地点
   const [meetingPoint, setMeetingPoint] = useState('')
   const [meetingCoords, setMeetingCoords] = useState<{ lat: number; lng: number } | null>(null)
@@ -468,10 +488,10 @@ export default function Generate() {
           <Text className="block text-xs text-gray-500 mr-2">返程时间</Text>
           <Picker
             mode="selector"
-            range={timeOptions}
+            range={returnTimeOptions}
             rangeKey="label"
-            value={timeOptions.findIndex(t => t.value === endTime)}
-            onChange={(e: any) => setEndTime(timeOptions[e.detail.value].value)}
+            value={returnTimeOptions.findIndex(t => t.value === endTime) || 0}
+            onChange={(e: any) => setEndTime(returnTimeOptions[e.detail.value].value)}
           >
             <View className="px-4 py-2 bg-gray-50 rounded-lg">
               <Text className="block text-sm text-gray-900">{endTime}</Text>
