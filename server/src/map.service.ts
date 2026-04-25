@@ -1,40 +1,40 @@
 import { Injectable } from '@nestjs/common'
 
-// 高德地图 API 配置
-const AMAP_KEY = process.env.AMAP_KEY || ''
-const AMAP_BASE_URL = 'https://restapi.amap.com/v3'
-
 @Injectable()
 export class MapService {
 
   /**
-   * 地理编码：将地址转换为经纬度
-   * @param address 地址（如 "北京市朝阳区xxx" 或 "厦门大学"）
-   * @param city 城市名（可选，用于提高匹配精度）
+   * 地理编码：将地址转换为经纬度（使用 Nominatim 免费服务）
+   * @param address 地址
+   * @param city 城市名（可选）
    */
   async geocode(address: string, city?: string): Promise<{ lat: number; lng: number } | null> {
-    if (!AMAP_KEY) {
-      console.warn('[MapService] 高德地图 KEY 未配置，使用模拟坐标')
-      return this.getMockLocation(address)
-    }
-
     try {
-      const params = new URLSearchParams({
-        key: AMAP_KEY,
-        address,
-        ...(city && { city })
+      // 构造查询地址
+      const searchQuery = city ? `${address}, ${city}, China` : `${address}, China`
+      const encodedQuery = encodeURIComponent(searchQuery)
+      
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&limit=1&countrycodes=cn`
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'ManxingApp/1.0' // Nominatim 要求 User-Agent
+        }
       })
-
-      const response = await fetch(`${AMAP_BASE_URL}/geocode/geo?${params}`)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
       const data = await response.json()
-
-      if (data.status === '1' && data.geocodes && data.geocodes.length > 0) {
-        const location = data.geocodes[0].location
-        const [lng, lat] = location.split(',').map(Number)
+      
+      if (data && data.length > 0) {
+        const lat = parseFloat(data[0].lat)
+        const lng = parseFloat(data[0].lon)
         console.log(`[MapService] 地理编码成功: ${address} -> (${lat}, ${lng})`)
         return { lat, lng }
       }
-
+      
       console.log(`[MapService] 地理编码无结果: ${address}`)
       return null
     } catch (error) {
@@ -44,9 +44,7 @@ export class MapService {
   }
 
   /**
-   * 关键词搜索：搜索地点并返回位置信息
-   * @param keywords 关键词
-   * @param city 城市名
+   * 关键词搜索：搜索地点并返回位置信息（使用 Nominatim）
    */
   async searchPlace(keywords: string, city?: string): Promise<{ 
     name: string
@@ -54,58 +52,42 @@ export class MapService {
     lat: number
     lng: number
   }[] | null> {
-    if (!AMAP_KEY) {
-      console.warn('[MapService] 高德地图 KEY 未配置')
-      return null
-    }
-
     try {
-      const params = new URLSearchParams({
-        key: AMAP_KEY,
-        keywords,
-        types: '风景名胜|美食|购物|酒店|景点',
-        ...(city && { city }),
-        offset: '5' // 限制返回数量
+      const searchQuery = city ? `${keywords}, ${city}, China` : `${keywords}, China`
+      const encodedQuery = encodeURIComponent(searchQuery)
+      
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&limit=5&countrycodes=cn`
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'ManxingApp/1.0'
+        }
       })
-
-      const response = await fetch(`${AMAP_BASE_URL}/place/text?${params}`)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
       const data = await response.json()
-
-      if (data.status === '1' && data.pois && data.pois.length > 0) {
-        return data.pois.map((poi: any) => ({
-          name: poi.name,
-          address: poi.address || '',
-          lat: parseFloat(poi.location.split(',')[1]),
-          lng: parseFloat(poi.location.split(',')[0])
+      
+      if (data && data.length > 0) {
+        return data.map((item: any) => ({
+          name: item.display_name.split(',')[0],
+          address: item.display_name,
+          lat: parseFloat(item.lat),
+          lng: parseFloat(item.lon)
         }))
       }
-
+      
       return null
     } catch (error) {
-      console.error(`[MapService] 地点搜索失败: ${keywords}`, error)
+      console.error(`[MapService] 搜索失败: ${keywords}`, error)
       return null
     }
   }
 
-  /**
-   * 计算两点之间的距离（直线距离）
-   */
-  calculateDistance(point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number {
-    const R = 6371 // 地球半径（公里）
-    const dLat = this.toRad(point2.lat - point1.lat)
-    const dLng = this.toRad(point2.lng - point1.lng)
-    
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(this.toRad(point1.lat)) * Math.cos(this.toRad(point2.lat)) *
-              Math.sin(dLng / 2) * Math.sin(dLng / 2)
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    return R * c
-  }
-
-  private toRad(deg: number): number {
-    return deg * (Math.PI / 180)
-  }
+      if (data.status === '1' && data.pois && data.pois.length > 0) {
+  
 
   /**
    * 智能排序灵感点：基于地理位置优化顺序
@@ -233,7 +215,7 @@ export class MapService {
   }
 
   /**
-   * 获取两点之间的实际道路距离（使用高德地图路径规划 API）
+   * 获取两点之间的实际道路距离（使用 OSRM 路线规划 API）
    * @param origin 起点 { lat, lng }
    * @param destination 终点 { lat, lng }
    * @returns 距离（米），如果失败返回 -1
@@ -242,70 +224,51 @@ export class MapService {
     origin: { lat: number; lng: number },
     destination: { lat: number; lng: number }
   ): Promise<number> {
-    if (!AMAP_KEY) {
-      // 没有 API Key，使用直线距离估算（实际道路距离通常是直线距离的 1.3-1.5 倍）
-      const straightDistance = this.calculateDistance(origin, destination)
-      return Math.round(straightDistance * 1.4) // 估算系数
-    }
-
     try {
-      // 使用高德地图路径规划 API
-      const params = new URLSearchParams({
-        key: AMAP_KEY,
-        origins: `${origin.lng},${origin.lat}`,
-        destinations: `${destination.lng},${destination.lat}`,
-        type: '1' // 驾车距离
-      })
-
-      const response = await fetch(`${AMAP_BASE_URL}/distance?${params}`)
+      // 使用 OSRM 公共路线规划服务（免费开源）
+      const url = `https://routing.openstreetmap.de/routed-car/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=false`
+      
+      const response = await fetch(url)
       const data = await response.json()
-
-      if (data.status === '1' && data.results && data.results.length > 0) {
-        const distance = data.results[0].distance
-        console.log(`[MapService] 道路距离: ${origin} -> ${destination} = ${distance}米`)
-        return parseInt(distance) || -1
+      
+      if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+        const distance = data.routes[0].distance // 单位是米
+        console.log(`[MapService] 道路距离: ${origin} -> ${destination} = ${Math.round(distance)}米`)
+        return Math.round(distance)
       }
-
-      console.log(`[MapService] 路径规划无结果，使用直线距离`)
+      
+      console.log(`[MapService] OSRM 无结果，使用直线距离`)
       return this.calculateDistance(origin, destination)
     } catch (error) {
-      console.error(`[MapService] 路径规划失败:`, error)
-      return this.calculateDistance(origin, destination)
+      console.error(`[MapService] OSRM 请求失败:`, error)
+      // 降级使用直线距离估算
+      const straightDistance = this.calculateDistance(origin, destination)
+      return Math.round(straightDistance * 1.4)
     }
   }
 
   /**
-   * 获取两点之间的步行距离（使用高德地图路径规划 API）
+   * 获取两点之间的步行距离（使用 OSRM 路线规划 API）
    */
   async getWalkingDistance(
     origin: { lat: number; lng: number },
     destination: { lat: number; lng: number }
   ): Promise<number> {
-    if (!AMAP_KEY) {
-      const straightDistance = this.calculateDistance(origin, destination)
-      return Math.round(straightDistance * 1.2) // 步行系数较小
-    }
-
     try {
-      const params = new URLSearchParams({
-        key: AMAP_KEY,
-        origins: `${origin.lng},${origin.lat}`,
-        destinations: `${destination.lng},${destination.lat}`,
-        type: '0' // 步行距离
-      })
-
-      const response = await fetch(`${AMAP_BASE_URL}/distance?${params}`)
+      const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=false`
+      
+      const response = await fetch(url)
       const data = await response.json()
-
-      if (data.status === '1' && data.results && data.results.length > 0) {
-        const distance = data.results[0].distance
-        return parseInt(distance) || -1
+      
+      if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+        return Math.round(data.routes[0].distance)
       }
-
+      
       return this.calculateDistance(origin, destination)
     } catch (error) {
-      console.error(`[MapService] 步行路径规划失败:`, error)
-      return this.calculateDistance(origin, destination)
+      console.error(`[MapService] OSRM 步行路线请求失败:`, error)
+      const straightDistance = this.calculateDistance(origin, destination)
+      return Math.round(straightDistance * 1.2)
     }
   }
 
@@ -406,26 +369,6 @@ export class MapService {
     // 默认返回前4个字符（可能是城市名）
     return location.length >= 4 ? location.substring(0, 4) : undefined
   }
-
-  /**
-   * 模拟坐标（当没有配置高德 KEY 时使用）
-   * 基于名称生成伪随机但稳定的坐标
-   */
-  private getMockLocation(name: string): { lat: number; lng: number } {
-    // 简单hash生成稳定坐标
-    let hash = 0
-    for (let i = 0; i < name.length; i++) {
-      hash = ((hash << 5) - hash) + name.charCodeAt(i)
-      hash = hash & hash
-    }
-
-    // 默认在中国范围内的随机坐标（模拟）
-    const lat = 30 + (hash % 100) / 100 * 10 // 30-40
-    const lng = 110 + ((hash >> 8) % 100) / 100 * 20 // 110-130
-
-    return { lat, lng }
-  }
-
   /**
    * 批量获取位置信息
    * 优先使用已有坐标，然后尝试获取缺失的
