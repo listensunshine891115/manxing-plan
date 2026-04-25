@@ -91,8 +91,8 @@ export default function Route() {
   }
   
   const [voteSetting, setVoteSetting] = useState({
-    startDate: getDefaultDateTime(1, 9),
-    endDate: getDefaultDateTime(1, 18),
+    startDate: getDefaultDateTime(0, 9),
+    endDate: getDefaultDateTime(0, 18),
     meetupPlace: [] as string[],
     meetupInput: '',
     voteDeadline: '',
@@ -626,6 +626,7 @@ export default function Route() {
                     <Picker
                       mode="date"
                       value={parseDate(voteSetting.startDate).date || format(new Date(), 'yyyy-MM-dd')}
+                      start={format(new Date(), 'yyyy-MM-dd')}
                       onChange={(e: any) => {
                         const newDate = e.detail.value
                         setVoteSetting(prev => ({
