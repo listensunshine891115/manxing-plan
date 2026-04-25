@@ -118,12 +118,15 @@ export default function Generate() {
   // 集合地点
   const [meetingPoint, setMeetingPoint] = useState('')
   const [meetingCoords, setMeetingCoords] = useState<{ lat: number; lng: number } | null>(null)
+  // 标记集合地点的来源：'none' | 'text' | 'map'
+  // 'text' - 文字输入，只有名称
+  // 'map' - 地图定位，有名称+坐标
+  const [meetingSource, setMeetingSource] = useState<'none' | 'text' | 'map'>('none')
   const [searchResults, setSearchResults] = useState<PlaceResult[]>([])
   const [showSearch, setShowSearch] = useState(false)
   const [showMapPicker, setShowMapPicker] = useState(false)
   const [mapCenter, setMapCenter] = useState({ latitude: 39.908823, longitude: 116.397470 }) // 默认北京天安门
   const [mapMarkers, setMapMarkers] = useState<any[]>([])
-  const [searching, setSearching] = useState(false)
   const [inputValue, setInputValue] = useState('')
 
   // 选中的灵感点
@@ -174,45 +177,25 @@ export default function Generate() {
     }
   }
 
-  // 搜索集合地点
-  const searchMeetingPoint = async (keyword: string) => {
-    if (!keyword.trim()) {
-      setSearchResults([])
-      return
-    }
-
-    setSearching(true)
-    try {
-      const res = await Network.request({
-        url: '/api/map/search',
-        method: 'POST',
-        data: { keywords: keyword }
-      })
-
-      console.log('[POST] /api/map/search - Response:', res.data)
-
-      if (res.data && res.data.data) {
-        setSearchResults(res.data.data)
-        setShowSearch(true)
-      }
-    } catch (error) {
-      console.error('搜索地点失败:', error)
-      setSearchResults([
-        { name: keyword, address: '搜索结果', lat: 24.48 + Math.random(), lng: 118.11 + Math.random() }
-      ])
-      setShowSearch(true)
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  // 选择搜索结果
+  // 选择搜索结果（地图搜索，有坐标）
   const selectMeetingPoint = (place: PlaceResult) => {
     setMeetingPoint(place.name)
     setMeetingCoords({ lat: place.lat, lng: place.lng })
+    setMeetingSource('map') // 标记为地图来源，有坐标
     setInputValue('')
     setShowSearch(false)
     setSearchResults([])
+  }
+
+  // 直接输入文字作为集合地点（无坐标）
+  const setTextMeetingPoint = () => {
+    if (inputValue.trim()) {
+      setMeetingPoint(inputValue.trim())
+      setMeetingCoords(null)
+      setMeetingSource('text') // 标记为文字来源，无坐标
+      setInputValue('')
+      setShowSearch(false)
+    }
   }
 
   // 打开内置地图选择器
@@ -267,6 +250,7 @@ export default function Generate() {
     if (mapMarkers.length > 0) {
       const marker = mapMarkers[0]
       setMeetingCoords({ lat: marker.latitude, lng: marker.longitude })
+      setMeetingSource('map') // 标记为地图来源，有坐标
       
       // 尝试逆地址解析获取地点名称
       try {
@@ -295,6 +279,7 @@ export default function Generate() {
   const clearMeetingPoint = () => {
     setMeetingPoint('')
     setMeetingCoords(null)
+    setMeetingSource('none')
     setInputValue('')
   }
 
@@ -654,6 +639,16 @@ export default function Generate() {
               <Text className="block text-sm text-green-700 ml-2 flex-1 truncate">
                 {meetingPoint}
               </Text>
+              {meetingSource === 'map' && meetingCoords && (
+                <View className="ml-2 px-2 py-1 rounded text-xs text-blue-600 bg-blue-50 border border-blue-200">
+                  已定位
+                </View>
+              )}
+              {meetingSource === 'text' && (
+                <View className="ml-2 px-2 py-1 rounded text-xs text-gray-600 bg-gray-100 border border-gray-200">
+                  文字
+                </View>
+              )}
             </View>
             <View 
               className="p-1"
@@ -668,39 +663,39 @@ export default function Generate() {
               <Search size={16} color="#9ca3af" />
               <Input
                 className="flex-1 ml-2 text-sm bg-transparent"
-                placeholder="输入集合地点名称后回车搜索"
+                placeholder="输入地点名称或点击地图定位"
                 value={inputValue}
                 onInput={(e: any) => setInputValue(e.detail.value)}
                 onConfirm={() => {
                   if (inputValue.trim()) {
-                    searchMeetingPoint(inputValue.trim())
+                    setTextMeetingPoint()
                   }
                 }}
               />
-              {searching && (
-                <Loader size={16} color="#3b82f6" className="animate-spin" />
-              )}
-              {!searching && (
-                <View className="flex items-center gap-2 ml-2">
-                  <View 
-                    className="px-2 py-1 rounded text-xs text-blue-500 border border-blue-200 bg-blue-50"
-                    onClick={openExternalMap}
-                  >
-                    地图
-                  </View>
-                  <View 
-                    className="px-2 py-1 rounded text-xs text-blue-500 border border-blue-200 bg-blue-50"
-                    onClick={() => {
-                      if (inputValue.trim()) {
-                        searchMeetingPoint(inputValue.trim())
-                      }
-                    }}
-                  >
-                    搜索
-                  </View>
+              <View className="flex items-center gap-2 ml-2">
+                <View 
+                  className="px-2 py-1 rounded text-xs text-blue-500 border border-blue-200 bg-blue-50"
+                  onClick={openExternalMap}
+                >
+                  地图
                 </View>
-              )}
+                <View 
+                  className="px-2 py-1 rounded text-xs text-green-600 border border-green-200 bg-green-50"
+                  onClick={() => {
+                    if (inputValue.trim()) {
+                      setTextMeetingPoint()
+                    }
+                  }}
+                >
+                  确定
+                </View>
+              </View>
             </View>
+
+            {/* 提示文字 */}
+            <Text className="block text-xs text-gray-400 mt-1">
+              直接输入名称（无位置），或点击&quot;地图&quot;定位（有位置）
+            </Text>
 
             {showSearch && searchResults.length > 0 && (
               <View className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-100 z-50 max-h-48 overflow-y-auto">
@@ -734,12 +729,6 @@ export default function Generate() {
               />
             )}
           </View>
-        )}
-
-        {meetingCoords && (
-          <Text className="block text-xs text-gray-400 mt-2">
-            已定位：({meetingCoords.lat.toFixed(4)}, {meetingCoords.lng.toFixed(4)})
-          </Text>
         )}
       </View>
     </View>
