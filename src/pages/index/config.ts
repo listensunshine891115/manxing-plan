@@ -63,7 +63,6 @@ export const secondaryTagConfig: Record<string, string> = {
   '体验课程': '活动',
   '工作坊': '活动',
   '打卡活动': '活动',
-  '演出': '活动',
   '音乐': '活动',
   '体育': '活动',
 }
