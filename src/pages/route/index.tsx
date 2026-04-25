@@ -172,12 +172,15 @@ export default function Route() {
     // 初始化投票设置
     const today = new Date()
     const defaultDeadline = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000) // 3天后
+    const formatDateTime = (d: Date) => {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
     setVoteSetting({
       startDate: '',
       endDate: '',
       meetupPlace: [],
       meetupInput: '',
-      voteDeadline: `${defaultDeadline.getFullYear()}-${String(defaultDeadline.getMonth() + 1).padStart(2, '0')}-${String(defaultDeadline.getDate()).padStart(2, '0')} 23:59`,
+      voteDeadline: formatDateTime(defaultDeadline),
     })
     setVoteSettingVisible(true)
   }
@@ -602,34 +605,35 @@ export default function Route() {
               <Text className="block text-sm font-medium text-gray-700 mb-2">旅行日期</Text>
               <View className="flex items-center gap-2">
                 <View className="flex-1">
-                  <Text className="block text-xs text-gray-500 mb-1">起始日期</Text>
+                  <Text className="block text-xs text-gray-500 mb-1">起始时间</Text>
                   <Input
-                    type="date"
+                    type="datetime-local"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
                     value={voteSetting.startDate}
                     onInput={(e: any) => setVoteSetting(prev => ({ 
                       ...prev, 
                       startDate: e.detail.value,
-                      // 如果结束日期比新的起始日期早，则更新结束日期
-                      endDate: prev.endDate && prev.endDate < e.detail.value ? e.detail.value : prev.endDate
                     }))}
-                    placeholder="选择日期"
+                    placeholder="选择日期和时间"
                   />
                 </View>
                 <Text className="text-gray-400 mt-4">至</Text>
                 <View className="flex-1">
-                  <Text className="block text-xs text-gray-500 mb-1">结束日期</Text>
+                  <Text className="block text-xs text-gray-500 mb-1">返程时间</Text>
                   <Input
-                    type="date"
+                    type="datetime-local"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
                     value={voteSetting.endDate}
                     min={voteSetting.startDate || undefined}
-                    onInput={(e: any) => setVoteSetting(prev => ({ ...prev, endDate: e.detail.value }))}
-                    placeholder="选择日期"
+                    onInput={(e: any) => setVoteSetting(prev => ({ 
+                      ...prev, 
+                      endDate: e.detail.value,
+                    }))}
+                    placeholder="选择日期和时间"
                   />
                 </View>
               </View>
-              <Text className="block text-xs text-gray-400 mt-1">起始和结束日期可以是同一天（一日游）</Text>
+              <Text className="block text-xs text-gray-400 mt-1">允许同一天，只需返程时间晚于出发时间</Text>
             </View>
 
             {/* 集合地点 */}
