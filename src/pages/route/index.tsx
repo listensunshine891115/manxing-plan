@@ -637,7 +637,6 @@ export default function Route() {
                     <Picker
                       mode="date"
                       value={parseDate(voteSetting.startDate).date || getBeijingDate()}
-                      start={getBeijingDate()}
                       onChange={(e: any) => {
                         const newDate = e.detail.value
                         setVoteSetting(prev => ({
