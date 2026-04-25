@@ -18,5 +18,11 @@ export default defineAppConfig({
     navigationBarBackgroundColor: '#ffffff',
     navigationBarTitleText: '此刻与你漫行',
     navigationBarTextStyle: 'black'
-  }
+  },
+  permission: {
+    "scope.userLocation": {
+      desc: "你的位置信息将用于确定集合地点"
+    }
+  },
+  requiredPrivateInfos: ["getLocation"]
 })
