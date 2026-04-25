@@ -628,6 +628,13 @@ export class ParseService {
         return await this.fetchWeChatArticle(realUrl)
       }
       
+      // 判断是否为小红书（使用 Playwright 获取）
+      const isXiaoHongShu = realUrl.includes('xiaohongshu.com') || realUrl.includes('xhslink.com')
+      
+      if (isXiaoHongShu) {
+        return await this.fetchXiaoHongShu(realUrl)
+      }
+      
       // 判断是否为票务平台
       const lowerUrl = realUrl.toLowerCase()
       const isTicketPlatform = 
@@ -823,6 +830,160 @@ export class ParseService {
       return { success: false, message: `获取公众号文章失败: ${error.message}` }
     } finally {
       // 确保浏览器被关闭
+      if (browser) {
+        await browser.close().catch(() => {})
+      }
+    }
+  }
+
+  // 专门获取小红书内容（使用 Playwright 渲染）
+  private async fetchXiaoHongShu(url: string): Promise<{
+    success: boolean
+    content?: string
+    title?: string
+    coverImage?: string
+    imageUrls?: string[]
+    message?: string
+  }> {
+    let browser: playwright.Browser | null = null
+    try {
+      console.log(`[Parse] 小红书内容，使用 Playwright 渲染获取: ${url}`)
+      
+      // 先解析短链接
+      let realUrl = url
+      if (url.includes('xhslink.com')) {
+        try {
+          const resolved = await this.resolveShortUrl(url)
+          if (resolved) {
+            realUrl = resolved
+            console.log(`[Parse] 小红书短链接解析: ${url} -> ${realUrl}`)
+          }
+        } catch (e) {
+          console.log(`[Parse] 小红书短链接解析失败`)
+        }
+      }
+      
+      // 使用 Playwright 启动无头浏览器
+      browser = await playwright.chromium.launch({ 
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      })
+      const page = await browser.newPage()
+      
+      // 设置视口和用户代理（移动端）
+      await page.setViewportSize({ width: 375, height: 812 })
+      await page.setExtraHTTPHeaders({
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+      })
+      
+      // 访问页面并等待内容加载
+      await page.goto(realUrl, { waitUntil: 'networkidle', timeout: 30000 })
+      
+      // 等待页面主要元素加载
+      await page.waitForTimeout(3000)
+      
+      // 获取标题
+      const title = await page.title()
+      console.log(`[Parse] 小红书标题: ${title}`)
+      
+      // 获取正文内容
+      const content = await page.evaluate(() => {
+        // 小红书的主要内容可能在多个位置
+        const selectors = [
+          // PC端
+          '.note-content', '.note-detail-content', '#detail-content',
+          '.content', '.main-content',
+          // 移动端
+          '.swiper-slide', '.note-swiper',
+          // 通用
+          'article', '.article', 'main', '[class*="content"]',
+          // 描述区域
+          '[class*="desc"]', '[class*="note"]', '[class*="detail"]'
+        ]
+        
+        let mainContent = ''
+        for (const selector of selectors) {
+          const el = document.querySelector((selector as string)) as HTMLElement | null
+          if (el) {
+            const text = el.innerText || el.textContent || ''
+            if (text.length > mainContent.length) {
+              mainContent = text
+            }
+          }
+        }
+        
+        // 如果没找到，尝试获取 body
+        if (!mainContent || mainContent.length < 50) {
+          mainContent = document.body.innerText || document.body.textContent || ''
+        }
+        
+        // 清理文本
+        mainContent = mainContent.replace(/\s+/g, ' ').trim()
+        
+        // 限制长度
+        if (mainContent.length > 5000) {
+          mainContent = mainContent.slice(0, 5000)
+        }
+        
+        return mainContent
+      })
+      
+      console.log(`[Parse] 小红书内容长度: ${content.length}`)
+      
+      // 获取页面中的图片
+      const imageUrls = await page.evaluate(() => {
+        const images = document.querySelectorAll('img')
+        const urls: string[] = []
+        
+        images.forEach((img) => {
+          let src = img.getAttribute('data-src') || img.getAttribute('src') || ''
+          // 过滤掉空白图、logo、icon 等
+          if (src && !src.includes('logo') && !src.includes('icon') && 
+              !src.includes('avatar') && !src.includes('avatar') &&
+              src.length > 100) {
+            urls.push(src)
+          }
+        })
+        
+        return urls.slice(0, 10) // 最多取10张图片
+      })
+      
+      console.log(`[Parse] 小红书图片数量: ${imageUrls.length}`)
+      
+      // 获取封面图
+      const coverImage = imageUrls.length > 0 ? imageUrls[0] : ''
+      
+      if (!content || content.length < 10) {
+        // 降级：尝试获取 meta 描述
+        const metaDesc = await page.evaluate(() => {
+          const meta = document.querySelector('meta[name="description"]')
+          return meta?.getAttribute('content') || ''
+        })
+        
+        if (metaDesc) {
+          return {
+            success: true,
+            content: metaDesc,
+            title,
+            coverImage,
+            imageUrls
+          }
+        }
+        
+        return { success: false, message: '无法提取小红书内容' }
+      }
+      
+      return {
+        success: true,
+        content,
+        title,
+        coverImage,
+        imageUrls
+      }
+    } catch (error: any) {
+      console.error(`[Parse] 小红书 Playwright 获取失败:`, error.message)
+      return { success: false, message: `获取小红书内容失败: ${error.message}` }
+    } finally {
       if (browser) {
         await browser.close().catch(() => {})
       }
