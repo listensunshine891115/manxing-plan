@@ -212,6 +212,34 @@ export default function Generate() {
     setSearchResults([])
   }
 
+  // 从地图选择地点
+  const chooseFromMap = async () => {
+    try {
+      await Taro.chooseLocation({
+        success: (result) => {
+          if (result && result.name) {
+            setMeetingPoint(result.name)
+            setMeetingCoords({ 
+              lat: result.latitude, 
+              lng: result.longitude 
+            })
+            setInputValue('')
+            setShowSearch(false)
+            setSearchResults([])
+          }
+        },
+        fail: (err) => {
+          console.log('[Generate] 选择地图失败:', err)
+          if (err.errMsg && !err.errMsg.includes('cancel')) {
+            Taro.showToast({ title: '请在地图上选择地点', icon: 'none' })
+          }
+        }
+      })
+    } catch (error) {
+      console.log('[Generate] chooseLocation error:', error)
+    }
+  }
+
   // 清除集合地点
   const clearMeetingPoint = () => {
     setMeetingPoint('')
@@ -600,6 +628,26 @@ export default function Generate() {
               />
               {searching && (
                 <Loader size={16} color="#3b82f6" className="animate-spin" />
+              )}
+              {!searching && (
+                <View className="flex items-center gap-2 ml-2">
+                  <View 
+                    className="px-2 py-1 rounded text-xs text-blue-500 border border-blue-200 bg-blue-50"
+                    onClick={chooseFromMap}
+                  >
+                    地图
+                  </View>
+                  <View 
+                    className="px-2 py-1 rounded text-xs text-blue-500 border border-blue-200 bg-blue-50"
+                    onClick={() => {
+                      if (inputValue.trim()) {
+                        searchMeetingPoint(inputValue.trim())
+                      }
+                    }}
+                  >
+                    搜索
+                  </View>
+                </View>
               )}
             </View>
 
