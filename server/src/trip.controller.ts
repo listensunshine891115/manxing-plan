@@ -27,6 +27,14 @@ export class TripController {
     return { code: 200, msg: 'success', data }
   }
 
+  // 获取收藏列表（必须放在 /inspirations/:id 前面，避免被参数路由匹配）
+  @Get('inspirations/favorites')
+  async getFavorites(@Query('userId') userId: string) {
+    console.log(`[GET] /api/trip/inspirations/favorites - userId: ${userId}`)
+    const data = await this.tripService.getFavorites(userId)
+    return { code: 200, msg: 'success', data }
+  }
+
   // 获取灵感详情
   @Get('inspirations/:id')
   async getInspirationById(@Param('id') id: string) {
@@ -97,14 +105,6 @@ export class TripController {
     console.log(`[POST] /api/trip/inspirations/${id}/favorite - isFavorite: ${body.isFavorite}`)
     await this.tripService.toggleFavorite(id, body.isFavorite)
     return { code: 200, msg: 'success' }
-  }
-
-  // 获取收藏列表
-  @Get('inspirations/favorites')
-  async getFavorites(@Query('userId') userId: string) {
-    console.log(`[GET] /api/trip/inspirations/favorites - userId: ${userId}`)
-    const data = await this.tripService.getFavorites(userId)
-    return { code: 200, msg: 'success', data }
   }
 
   // ==================== 路线规划 ====================
