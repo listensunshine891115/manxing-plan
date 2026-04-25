@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { View, Text } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, CalendarDays, MapPin, Loader, Users, Clock, Car, Bus } from 'lucide-react-taro'
-import Taro from '@tarojs/taro'
+import { ArrowLeft, CalendarDays, MapPin, Loader, Users, Clock, Car, Bus, CalendarCheck, Share2 } from 'lucide-react-taro'
+import Taro, { useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import { Network } from '@/network'
 import './index.css'
 
@@ -72,10 +72,29 @@ export default function Confirm() {
   const [routePlan, setRoutePlan] = useState<RoutePlanResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [confirming, setConfirming] = useState(false)
+  // 是否需要同伴投票弹窗
+  const [showVoteChoice, setShowVoteChoice] = useState(false)
 
   useEffect(() => {
     loadRoutePlan()
   }, [])
+
+  // 配置分享给好友（行程概览）
+  useShareAppMessage(() => {
+    return {
+      title: routePlan ? `${routePlan.settings.startDate}旅行行程` : '我的旅行行程',
+      path: '/pages/preview/index',
+      imageUrl: ''
+    }
+  })
+
+  // 配置分享到朋友圈
+  useShareTimeline(() => {
+    return {
+      title: routePlan ? `${routePlan.settings.startDate}旅行行程` : '我的旅行行程',
+      imageUrl: ''
+    }
+  })
 
   const loadRoutePlan = async () => {
     try {
@@ -93,8 +112,63 @@ export default function Confirm() {
     }
   }
 
-  // 确认并分享投票
-  const handleConfirm = async () => {
+  // 保存行程并跳转到行程概览页面（不需要投票）
+  const handleSaveToOverview = async () => {
+    if (!routePlan) return
+
+    setConfirming(true)
+    try {
+      // 获取用户信息
+      const userInfo = Taro.getStorageSync('userInfo')
+      const userId = userInfo?.id
+
+      // 调用后端 API 保存行程
+      const res = await Network.request({
+        url: '/api/trip/trips',
+        method: 'POST',
+        data: {
+          version_name: `行程-${routePlan.settings.startDate}`,
+          content: [{
+            itinerary: routePlan.itinerary,
+            route: routePlan.route,
+            statistics: routePlan.statistics
+          }],
+          settings: {
+            start_date: routePlan.settings.startDate,
+            days: routePlan.settings.days,
+            mainDestination: routePlan.settings.mainDestination
+          },
+          user_id: userId
+        }
+      })
+
+      console.log('[POST] /api/trip/trips - Response:', res.data)
+
+      if (res.data && res.data.code === 200) {
+        const tripId = res.data.data?.id
+        
+        // 保存到本地存储，供行程概览页面使用
+        await Taro.setStorage({ key: 'savedTrip', data: routePlan })
+        await Taro.setStorage({ key: 'currentTripId', data: tripId })
+
+        Taro.showToast({ title: '保存成功', icon: 'success' })
+        
+        // 延迟跳转，让用户看到成功提示，然后跳转到行程概览页面
+        setTimeout(() => {
+          Taro.navigateTo({ url: '/pages/preview/index' })
+        }, 1500)
+      } else {
+        throw new Error(res.data?.msg || '保存失败')
+      }
+    } catch (error: any) {
+      console.error('保存行程失败:', error)
+      Taro.showToast({ title: error.message || '保存失败，请重试', icon: 'none' })
+      setConfirming(false)
+    }
+  }
+
+  // 确认并创建投票（需要投票）
+  const handleConfirmVote = async () => {
     if (!routePlan) return
 
     setConfirming(true)
@@ -189,6 +263,23 @@ export default function Confirm() {
       Taro.showToast({ title: error.message || '保存失败，请重试', icon: 'none' })
       setConfirming(false)
     }
+  }
+
+  // 确认按钮点击 - 显示选择弹窗
+  const handleConfirm = () => {
+    setShowVoteChoice(true)
+  }
+
+  // 用户选择需要投票
+  const handleChooseVote = () => {
+    setShowVoteChoice(false)
+    handleConfirmVote()
+  }
+
+  // 用户选择不需要投票
+  const handleChooseNoVote = () => {
+    setShowVoteChoice(false)
+    handleSaveToOverview()
   }
 
   if (loading) {
@@ -378,7 +469,6 @@ export default function Confirm() {
       </View>
 
       {/* 底部确认按钮 */}
-      {/* 底部按钮 */}
       <View 
         style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
@@ -398,12 +488,88 @@ export default function Confirm() {
             </>
           ) : (
             <>
-              <Users size={18} color="#ffffff" className="mr-2" />
-              <Text className="text-white">分享投票邀请</Text>
+              <CalendarCheck size={18} color="#ffffff" className="mr-2" />
+              <Text className="text-white">确认并继续</Text>
             </>
           )}
         </Button>
       </View>
+
+      {/* 是否需要同伴投票选择弹窗 */}
+      {showVoteChoice && (
+        <View 
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}
+          onClick={() => setShowVoteChoice(false)}
+        >
+          <View 
+            style={{
+              width: '80%', maxWidth: '320px',
+              backgroundColor: '#fff', borderRadius: '16px',
+              padding: '24px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Text className="block text-lg font-semibold text-gray-900 text-center mb-2">
+              是否需要同伴投票？
+            </Text>
+            <Text className="block text-sm text-gray-500 text-center mb-6">
+              选择后行程将被保存并生成分享链接
+            </Text>
+            
+            {/* 需要投票 */}
+            <View 
+              style={{
+                padding: '16px', borderRadius: '12px',
+                border: '1px solid #3b82f6', backgroundColor: '#eff6ff',
+                marginBottom: '12px'
+              }}
+              onClick={handleChooseVote}
+            >
+              <View className="flex items-center">
+                <Users size={20} color="#3b82f6" />
+                <View className="ml-3 flex-1">
+                  <Text className="block text-base font-medium text-blue-600">需要同伴投票</Text>
+                  <Text className="block text-xs text-gray-500 mt-1">
+                    邀请好友对行程景点投票，共同决定最终路线
+                  </Text>
+                </View>
+              </View>
+            </View>
+            
+            {/* 不需要投票 */}
+            <View 
+              style={{
+                padding: '16px', borderRadius: '12px',
+                border: '1px solid #10b981', backgroundColor: '#f0fdf4',
+                marginBottom: '12px'
+              }}
+              onClick={handleChooseNoVote}
+            >
+              <View className="flex items-center">
+                <Share2 size={20} color="#10b981" />
+                <View className="ml-3 flex-1">
+                  <Text className="block text-base font-medium text-green-600">不需要投票</Text>
+                  <Text className="block text-xs text-gray-500 mt-1">
+                    直接生成行程概览，分享给朋友查看
+                  </Text>
+                </View>
+              </View>
+            </View>
+            
+            <Button 
+              variant="outline" 
+              className="w-full mt-2"
+              onClick={() => setShowVoteChoice(false)}
+            >
+              取消
+            </Button>
+          </View>
+        </View>
+      )}
     </View>
   )
 }
