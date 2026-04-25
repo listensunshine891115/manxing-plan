@@ -612,19 +612,6 @@ export default function Index() {
         </View>
       )}
 
-      {/* 公众号二维码 */}
-      <View className="px-4 py-3 mb-20 bg-gray-50">
-        <View className="flex flex-col items-center bg-white rounded-xl p-4 shadow-sm">
-          <Text className="block text-sm text-gray-500 mb-3">关注公众号，获取更多旅行灵感</Text>
-          <Image 
-            src="https://coze-coding-project.tos.coze.site/coze_storage_7632138256662036520/wechat-qrcode_e35c798b.jpg?sign=1808643446-b57ab8e048-0-fb0318f7126aedc977ca7378ae37851a7bfe73aca58c72975fa18272d7423509"
-            className="w-32 h-32 rounded-lg"
-            mode="aspectFill"
-          />
-          <Text className="block text-xs text-gray-400 mt-2">长按识别上方二维码</Text>
-        </View>
-      </View>
-
       {/* 预览灵感点弹窗 */}
       {showPreviewDialog && (
         <View 
