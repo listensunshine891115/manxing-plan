@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image, Picker } from '@tarojs/components'
+import { View, Text, Image } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -7,7 +7,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { 
   ArrowLeft, Share2, ChevronUp, ChevronDown, MapPin, Clock, 
-  Navigation, Sparkles, Route as RouteIcon, Circle, Users, ThumbsUp, X, Plus, CalendarDays
+  Navigation, Sparkles, Route as RouteIcon, Circle, Users, ThumbsUp, X, Plus
 } from 'lucide-react-taro'
 import { Network } from '@/network'
 import Taro from '@tarojs/taro'
@@ -90,11 +90,6 @@ export default function Route() {
     const beijingOffset = 8 * 60 * 60 * 1000
     const beijingTime = new Date(date.getTime() + beijingOffset)
     return `${beijingTime.getUTCFullYear()}-${String(beijingTime.getUTCMonth() + 1).padStart(2, '0')}-${String(beijingTime.getUTCDate()).padStart(2, '0')}`
-  }
-  
-  // 获取北京时间今天的日期字符串 (UTC+8)
-  const getBeijingDate = (date: Date = new Date()) => {
-    return getBeijingDateStr(date)
   }
   
   // 解析日期时间字符串
@@ -633,44 +628,41 @@ export default function Route() {
                 <View className="flex-1">
                   <Text className="block text-xs text-gray-500 mb-1">出发日期</Text>
                   <View className="border border-gray-200 rounded-lg overflow-hidden">
-                    <Picker
-                      mode="date"
-                      value={parseDateTime(voteSetting.startDate).date || getBeijingDate()}
-                      onChange={(e: any) => {
+                    <Input
+                      type="date"
+                      className="w-full px-3 py-2 bg-white text-sm"
+                      value={parseDateTime(voteSetting.startDate).date}
+                      onInput={(e: any) => {
                         const newDate = e.detail.value
-                        setVoteSetting(prev => ({
-                          ...prev,
-                          startDate: mergeDateTime(newDate, parseDateTime(prev.startDate).time)
-                        }))
+                        if (newDate) {
+                          setVoteSetting(prev => ({
+                            ...prev,
+                            startDate: mergeDateTime(newDate, parseDateTime(prev.startDate).time)
+                          }))
+                        }
                       }}
-                    >
-                      <View className="px-3 py-2 bg-white flex items-center">
-                        <CalendarDays size={14} color="#64748B" className="mr-2" />
-                        <Text className="text-sm text-gray-900">
-                          {parseDateTime(voteSetting.startDate).date || '选择日期'}
-                        </Text>
-                      </View>
-                    </Picker>
+                      placeholder="选择日期"
+                    />
                   </View>
                 </View>
                 <View className="w-20">
                   <Text className="block text-xs text-gray-500 mb-1">时间</Text>
                   <View className="border border-gray-200 rounded-lg overflow-hidden">
-                    <Picker
-                      mode="time"
+                    <Input
+                      type="time"
+                      className="w-full px-2 py-2 bg-white text-sm text-center"
                       value={parseDateTime(voteSetting.startDate).time}
-                      onChange={(e: any) => {
+                      onInput={(e: any) => {
                         const newTime = e.detail.value
-                        setVoteSetting(prev => ({
-                          ...prev,
-                          startDate: mergeDateTime(parseDateTime(prev.startDate).date, newTime)
-                        }))
+                        if (newTime) {
+                          setVoteSetting(prev => ({
+                            ...prev,
+                            startDate: mergeDateTime(parseDateTime(prev.startDate).date, newTime)
+                          }))
+                        }
                       }}
-                    >
-                      <View className="px-2 py-2 bg-white text-center">
-                        <Text className="text-sm text-gray-900">{parseDateTime(voteSetting.startDate).time}</Text>
-                      </View>
-                    </Picker>
+                      placeholder="时间"
+                    />
                   </View>
                 </View>
               </View>
@@ -678,45 +670,42 @@ export default function Route() {
                 <View className="flex-1">
                   <Text className="block text-xs text-gray-500 mb-1">返程日期</Text>
                   <View className="border border-gray-200 rounded-lg overflow-hidden">
-                    <Picker
-                      mode="date"
-                      value={parseDateTime(voteSetting.endDate).date || getBeijingDate()}
-                      start={parseDateTime(voteSetting.startDate).date || getBeijingDate()}
-                      onChange={(e: any) => {
+                    <Input
+                      type="date"
+                      className="w-full px-3 py-2 bg-white text-sm"
+                      value={parseDateTime(voteSetting.endDate).date}
+                      onInput={(e: any) => {
                         const newDate = e.detail.value
-                        setVoteSetting(prev => ({
-                          ...prev,
-                          endDate: mergeDateTime(newDate, parseDateTime(prev.endDate).time)
-                        }))
+                        if (newDate) {
+                          setVoteSetting(prev => ({
+                            ...prev,
+                            endDate: mergeDateTime(newDate, parseDateTime(prev.endDate).time)
+                          }))
+                        }
                       }}
-                    >
-                      <View className="px-3 py-2 bg-white flex items-center">
-                        <CalendarDays size={14} color="#64748B" className="mr-2" />
-                        <Text className="text-sm text-gray-900">
-                          {parseDateTime(voteSetting.endDate).date || '选择日期'}
-                        </Text>
-                      </View>
-                    </Picker>
+                      min={parseDateTime(voteSetting.startDate).date}
+                      placeholder="选择日期"
+                    />
                   </View>
                 </View>
                 <View className="w-20">
                   <Text className="block text-xs text-gray-500 mb-1">时间</Text>
                   <View className="border border-gray-200 rounded-lg overflow-hidden">
-                    <Picker
-                      mode="time"
+                    <Input
+                      type="time"
+                      className="w-full px-2 py-2 bg-white text-sm text-center"
                       value={parseDateTime(voteSetting.endDate).time}
-                      onChange={(e: any) => {
+                      onInput={(e: any) => {
                         const newTime = e.detail.value
-                        setVoteSetting(prev => ({
-                          ...prev,
-                          endDate: mergeDateTime(parseDateTime(prev.endDate).date, newTime)
-                        }))
+                        if (newTime) {
+                          setVoteSetting(prev => ({
+                            ...prev,
+                            endDate: mergeDateTime(parseDateTime(prev.endDate).date, newTime)
+                          }))
+                        }
                       }}
-                    >
-                      <View className="px-2 py-2 bg-white text-center">
-                        <Text className="text-sm text-gray-900">{parseDateTime(voteSetting.endDate).time}</Text>
-                      </View>
-                    </Picker>
+                      placeholder="时间"
+                    />
                   </View>
                 </View>
               </View>
