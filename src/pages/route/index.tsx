@@ -84,39 +84,38 @@ export default function Route() {
   const [voteSession, setVoteSession] = useState<{ shareCode: string; sessionId: string; voteDeadline: string } | null>(null)
   const [voteStats, setVoteStats] = useState<Record<string, { likes: number; dislikes: number }>>({})
   const [voteSettingVisible, setVoteSettingVisible] = useState(false)
-  // 获取北京时间日期时间字符串 (UTC+8)
-  const getBeijingDateTime = (daysFromNow: number, hour: number = 9) => {
-    const d = new Date(Date.now() + daysFromNow * 86400000)
-    const beijingOffset = 8 * 60 * 60 * 1000 // 北京时区偏移量
-    const beijingTime = new Date(d.getTime() + beijingOffset)
-    return `${beijingTime.getUTCFullYear()}-${String(beijingTime.getUTCMonth() + 1).padStart(2, '0')}-${String(beijingTime.getUTCDate()).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00`
-  }
   
-  // 获取北京时间今天的日期字符串 (UTC+8)
-  const getBeijingDate = (date: Date = new Date()) => {
-    const beijingOffset = 8 * 60 * 60 * 1000 // 北京时区偏移量
+  // 获取北京时间日期字符串 (格式: YYYY-MM-DD)
+  const getBeijingDateStr = (date: Date = new Date()) => {
+    const beijingOffset = 8 * 60 * 60 * 1000
     const beijingTime = new Date(date.getTime() + beijingOffset)
     return `${beijingTime.getUTCFullYear()}-${String(beijingTime.getUTCMonth() + 1).padStart(2, '0')}-${String(beijingTime.getUTCDate()).padStart(2, '0')}`
   }
   
-  const [voteSetting, setVoteSetting] = useState({
-    startDate: getBeijingDateTime(0, 9),
-    endDate: getBeijingDateTime(0, 18),
-    meetupPlace: [] as string[],
-    meetupInput: '',
-    voteDeadline: '',
-  })
-
-  // 解析日期时间
-  const parseDate = (dateTimeStr: string) => {
-    const [date, time] = dateTimeStr.split('T')
-    return { date: date || '', time: time || '09:00' }
+  // 获取北京时间今天的日期字符串 (UTC+8)
+  const getBeijingDate = (date: Date = new Date()) => {
+    return getBeijingDateStr(date)
   }
-
+  
+  // 解析日期时间字符串
+  const parseDateTime = (dateTimeStr: string) => {
+    if (!dateTimeStr) return { date: getBeijingDateStr(), time: '09:00' }
+    const [date, time] = dateTimeStr.split('T')
+    return { date: date || getBeijingDateStr(), time: time || '09:00' }
+  }
+  
   // 合并日期和时间
   const mergeDateTime = (date: string, time: string) => {
     return `${date}T${time}`
   }
+  
+  const [voteSetting, setVoteSetting] = useState({
+    startDate: getBeijingDateStr() + 'T09:00',
+    endDate: getBeijingDateStr() + 'T18:00',
+    meetupPlace: [] as string[],
+    meetupInput: '',
+    voteDeadline: '',
+  })
 
   // 加载路线规划结果
   useEffect(() => {
@@ -203,8 +202,8 @@ export default function Route() {
       return `${beijingTime.getUTCFullYear()}-${String(beijingTime.getUTCMonth() + 1).padStart(2, '0')}-${String(beijingTime.getUTCDate()).padStart(2, '0')}T${String(beijingTime.getUTCHours()).padStart(2, '0')}:${String(beijingTime.getUTCMinutes()).padStart(2, '0')}`
     }
     setVoteSetting({
-      startDate: getBeijingDateTime(1, 9),
-      endDate: getBeijingDateTime(1, 18),
+      startDate: getBeijingDateStr() + 'T09:00',
+      endDate: getBeijingDateStr() + 'T18:00',
       meetupPlace: [],
       meetupInput: '',
       voteDeadline: formatBeijingDateTime(defaultDeadline),
@@ -636,19 +635,19 @@ export default function Route() {
                   <View className="border border-gray-200 rounded-lg overflow-hidden">
                     <Picker
                       mode="date"
-                      value={parseDate(voteSetting.startDate).date || getBeijingDate()}
+                      value={parseDateTime(voteSetting.startDate).date || getBeijingDate()}
                       onChange={(e: any) => {
                         const newDate = e.detail.value
                         setVoteSetting(prev => ({
                           ...prev,
-                          startDate: mergeDateTime(newDate, parseDate(prev.startDate).time)
+                          startDate: mergeDateTime(newDate, parseDateTime(prev.startDate).time)
                         }))
                       }}
                     >
                       <View className="px-3 py-2 bg-white flex items-center">
                         <CalendarDays size={14} color="#64748B" className="mr-2" />
                         <Text className="text-sm text-gray-900">
-                          {parseDate(voteSetting.startDate).date || '选择日期'}
+                          {parseDateTime(voteSetting.startDate).date || '选择日期'}
                         </Text>
                       </View>
                     </Picker>
@@ -659,17 +658,17 @@ export default function Route() {
                   <View className="border border-gray-200 rounded-lg overflow-hidden">
                     <Picker
                       mode="time"
-                      value={parseDate(voteSetting.startDate).time}
+                      value={parseDateTime(voteSetting.startDate).time}
                       onChange={(e: any) => {
                         const newTime = e.detail.value
                         setVoteSetting(prev => ({
                           ...prev,
-                          startDate: mergeDateTime(parseDate(prev.startDate).date, newTime)
+                          startDate: mergeDateTime(parseDateTime(prev.startDate).date, newTime)
                         }))
                       }}
                     >
                       <View className="px-2 py-2 bg-white text-center">
-                        <Text className="text-sm text-gray-900">{parseDate(voteSetting.startDate).time}</Text>
+                        <Text className="text-sm text-gray-900">{parseDateTime(voteSetting.startDate).time}</Text>
                       </View>
                     </Picker>
                   </View>
@@ -681,20 +680,20 @@ export default function Route() {
                   <View className="border border-gray-200 rounded-lg overflow-hidden">
                     <Picker
                       mode="date"
-                      value={parseDate(voteSetting.endDate).date || getBeijingDate()}
-                      start={`${parseDate(voteSetting.startDate).date || getBeijingDate()}T00:00:00`}
+                      value={parseDateTime(voteSetting.endDate).date || getBeijingDate()}
+                      start={parseDateTime(voteSetting.startDate).date || getBeijingDate()}
                       onChange={(e: any) => {
                         const newDate = e.detail.value
                         setVoteSetting(prev => ({
                           ...prev,
-                          endDate: mergeDateTime(newDate, parseDate(prev.endDate).time)
+                          endDate: mergeDateTime(newDate, parseDateTime(prev.endDate).time)
                         }))
                       }}
                     >
                       <View className="px-3 py-2 bg-white flex items-center">
                         <CalendarDays size={14} color="#64748B" className="mr-2" />
                         <Text className="text-sm text-gray-900">
-                          {parseDate(voteSetting.endDate).date || '选择日期'}
+                          {parseDateTime(voteSetting.endDate).date || '选择日期'}
                         </Text>
                       </View>
                     </Picker>
@@ -705,17 +704,17 @@ export default function Route() {
                   <View className="border border-gray-200 rounded-lg overflow-hidden">
                     <Picker
                       mode="time"
-                      value={parseDate(voteSetting.endDate).time}
+                      value={parseDateTime(voteSetting.endDate).time}
                       onChange={(e: any) => {
                         const newTime = e.detail.value
                         setVoteSetting(prev => ({
                           ...prev,
-                          endDate: mergeDateTime(parseDate(prev.endDate).date, newTime)
+                          endDate: mergeDateTime(parseDateTime(prev.endDate).date, newTime)
                         }))
                       }}
                     >
                       <View className="px-2 py-2 bg-white text-center">
-                        <Text className="text-sm text-gray-900">{parseDate(voteSetting.endDate).time}</Text>
+                        <Text className="text-sm text-gray-900">{parseDateTime(voteSetting.endDate).time}</Text>
                       </View>
                     </Picker>
                   </View>
