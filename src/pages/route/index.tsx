@@ -3,9 +3,11 @@ import { View, Text, Image } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { 
   ArrowLeft, Share2, ChevronUp, ChevronDown, MapPin, Clock, 
-  Navigation, Sparkles, Route as RouteIcon, Circle, Users, ThumbsUp
+  Navigation, Sparkles, Route as RouteIcon, Circle, Users, ThumbsUp, X, Plus
 } from 'lucide-react-taro'
 import { Network } from '@/network'
 import Taro from '@tarojs/taro'
@@ -79,8 +81,16 @@ export default function Route() {
   const [routePlan, setRoutePlan] = useState<RoutePlanResult | null>(null)
   const [versions, setVersions] = useState<RouteVersion[]>([])
   const [loading, setLoading] = useState(true)
-  const [voteSession, setVoteSession] = useState<{ shareCode: string; sessionId: string } | null>(null)
+  const [voteSession, setVoteSession] = useState<{ shareCode: string; sessionId: string; voteDeadline: string } | null>(null)
   const [voteStats, setVoteStats] = useState<Record<string, { likes: number; dislikes: number }>>({})
+  const [voteSettingVisible, setVoteSettingVisible] = useState(false)
+  const [voteSetting, setVoteSetting] = useState({
+    startDate: '',
+    endDate: '',
+    meetupPlace: [] as string[],
+    meetupInput: '',
+    voteDeadline: '',
+  })
 
   // 加载路线规划结果
   useEffect(() => {
@@ -137,8 +147,68 @@ export default function Route() {
   const handleShareVote = async () => {
     if (!routePlan) return
 
+    // 如果已有投票会话，显示分享链接
+    if (voteSession) {
+      const shareUrl = `/pages/vote/index?code=${voteSession.shareCode}`
+      Taro.showModal({
+        title: '分享投票链接',
+        content: `好友打开即可投票参与路线设计！\n\n链接：${shareUrl}`,
+        confirmText: '复制链接',
+        cancelText: '关闭',
+        success: (modalRes) => {
+          if (modalRes.confirm) {
+            Taro.setClipboardData({
+              data: shareUrl,
+              success: () => {
+                Taro.showToast({ title: '链接已复制', icon: 'success' })
+              }
+            })
+          }
+        }
+      })
+      return
+    }
+
+    // 初始化投票设置
+    const today = new Date()
+    const defaultDeadline = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000) // 3天后
+    setVoteSetting({
+      startDate: '',
+      endDate: '',
+      meetupPlace: [],
+      meetupInput: '',
+      voteDeadline: `${defaultDeadline.getFullYear()}-${String(defaultDeadline.getMonth() + 1).padStart(2, '0')}-${String(defaultDeadline.getDate()).padStart(2, '0')} 23:59`,
+    })
+    setVoteSettingVisible(true)
+  }
+
+  // 添加集合地点标签
+  const handleAddMeetupPlace = () => {
+    const value = voteSetting.meetupInput.trim()
+    if (value && !voteSetting.meetupPlace.includes(value)) {
+      setVoteSetting(prev => ({
+        ...prev,
+        meetupPlace: [...prev.meetupPlace, value],
+        meetupInput: '',
+      }))
+    }
+  }
+
+  // 删除集合地点标签
+  const handleRemoveMeetupPlace = (index: number) => {
+    setVoteSetting(prev => ({
+      ...prev,
+      meetupPlace: prev.meetupPlace.filter((_, i) => i !== index),
+    }))
+  }
+
+  // 确认创建投票
+  const handleConfirmVote = async () => {
+    if (!routePlan) return
+
     try {
-      Taro.showLoading({ title: '创建投票链接...' })
+      Taro.showLoading({ title: '创建投票...' })
+      setVoteSettingVisible(false)
 
       // 获取用户信息
       const userInfo = Taro.getStorageSync('userInfo')
@@ -163,15 +233,18 @@ export default function Route() {
           title: routePlan.settings.mainDestination || '漫行计划',
           creatorName: nickname,
           inspirationPoints,
-          expiresDays: 7,
+          startDate: voteSetting.startDate,
+          endDate: voteSetting.endDate,
+          meetupPlace: voteSetting.meetupPlace,
+          voteDeadline: new Date(voteSetting.voteDeadline).toISOString(),
         },
       })
 
       console.log('[Route] 创建投票会话响应:', res.data)
 
       if (res.data.code === 200 && res.data.data) {
-        const { shareCode, sessionId } = res.data.data
-        setVoteSession({ shareCode, sessionId })
+        const { shareCode, sessionId, voteDeadline } = res.data.data
+        setVoteSession({ shareCode, sessionId, voteDeadline })
 
         // 加载投票统计
         loadVoteStats(sessionId)
@@ -183,13 +256,12 @@ export default function Route() {
 
         // 显示分享选项
         Taro.showModal({
-          title: '分享投票链接',
-          content: `已创建投票链接，好友打开即可投票参与路线设计！\n\n点击确定复制链接`,
+          title: '投票已创建！',
+          content: `截止时间：${new Date(voteDeadline).toLocaleString('zh-CN')}\n\n好友打开链接即可投票`,
           confirmText: '复制链接',
           cancelText: '稍后',
           success: (modalRes) => {
             if (modalRes.confirm) {
-              // 复制链接到剪贴板
               Taro.setClipboardData({
                 data: shareUrl,
                 success: () => {
@@ -457,12 +529,28 @@ export default function Route() {
 
       {/* 投票信息 */}
       {voteSession && (
-        <View className="mx-4 mt-2 p-3 bg-green-50 rounded-xl border border-green-200 flex items-center justify-between">
-          <View className="flex items-center">
-            <Users size={16} color="#22C55E" className="mr-2" />
-            <Text className="text-sm text-green-600">投票链接已分享</Text>
+        <View className="mx-4 mt-2 p-3 bg-green-50 rounded-xl border border-green-200">
+          <View className="flex items-center justify-between mb-2">
+            <View className="flex items-center">
+              <Users size={16} color="#22C55E" className="mr-2" />
+              <Text className="text-sm text-green-600 font-medium">投票已开启</Text>
+            </View>
+            <Text className="text-xs text-green-500">
+              截止：{new Date(voteSession.voteDeadline).toLocaleDateString('zh-CN')}
+            </Text>
           </View>
-          <Text className="text-xs text-green-500">等待好友投票</Text>
+          <View 
+            className="p-2 bg-white rounded-lg"
+            onClick={() => {
+              const shareUrl = `/pages/vote/index?code=${voteSession.shareCode}`
+              Taro.setClipboardData({
+                data: shareUrl,
+                success: () => Taro.showToast({ title: '链接已复制', icon: 'success' })
+              })
+            }}
+          >
+            <Text className="text-xs text-gray-500">点击复制投票链接</Text>
+          </View>
         </View>
       )}
 
@@ -482,7 +570,7 @@ export default function Route() {
           >
             <Share2 size={18} color={voteSession ? "#22C55E" : "#3B82F6"} className="mr-2" />
             <Text style={{ color: voteSession ? '#22C55E' : '#3B82F6' }}>
-              {voteSession ? '已分享' : '分享投票'}
+              {voteSession ? '分享投票' : '邀请投票'}
             </Text>
           </Button>
           <Button
@@ -502,6 +590,94 @@ export default function Route() {
           <Text className="text-gray-500">重新规划</Text>
         </Button>
       </View>
+
+      {/* 投票设置弹窗 */}
+      <Dialog open={voteSettingVisible} onOpenChange={setVoteSettingVisible}>
+        <DialogContent className="max-w-md mx-auto">
+          <View className="p-4">
+            <Text className="block text-lg font-semibold text-gray-800 mb-4">投票设置</Text>
+
+            {/* 旅行日期 */}
+            <View className="mb-4">
+              <Text className="block text-sm font-medium text-gray-700 mb-2">旅行日期</Text>
+              <View className="flex items-center gap-2">
+                <View className="flex-1">
+                  <Text className="block text-xs text-gray-500 mb-1">起始日期</Text>
+                  <Input
+                    type="date"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    value={voteSetting.startDate}
+                    onInput={(e: any) => setVoteSetting(prev => ({ ...prev, startDate: e.detail.value }))}
+                    placeholder="选择日期"
+                  />
+                </View>
+                <Text className="text-gray-400 mt-4">至</Text>
+                <View className="flex-1">
+                  <Text className="block text-xs text-gray-500 mb-1">结束日期</Text>
+                  <Input
+                    type="date"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    value={voteSetting.endDate}
+                    onInput={(e: any) => setVoteSetting(prev => ({ ...prev, endDate: e.detail.value }))}
+                    placeholder="选择日期"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* 集合地点 */}
+            <View className="mb-4">
+              <Text className="block text-sm font-medium text-gray-700 mb-2">集合地点</Text>
+              <View className="flex flex-wrap gap-2 mb-2">
+                {voteSetting.meetupPlace.map((place, index) => (
+                  <View key={index} className="flex items-center px-3 py-1 bg-blue-50 rounded-full">
+                    <MapPin size={12} color="#3B82F6" className="mr-1" />
+                    <Text className="text-sm text-blue-600">{place}</Text>
+                    <View 
+                      className="ml-1 p-1"
+                      onClick={() => handleRemoveMeetupPlace(index)}
+                    >
+                      <X size={12} color="#6B7280" />
+                    </View>
+                  </View>
+                ))}
+              </View>
+              <View className="flex gap-2">
+                <Input
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  value={voteSetting.meetupInput}
+                  onInput={(e: any) => setVoteSetting(prev => ({ ...prev, meetupInput: e.detail.value }))}
+                  onConfirm={handleAddMeetupPlace}
+                  placeholder="输入地点后回车添加"
+                />
+                <Button size="sm" onClick={handleAddMeetupPlace}>
+                  <Plus size={16} color="#fff" />
+                </Button>
+              </View>
+            </View>
+
+            {/* 投票截止时间 */}
+            <View className="mb-4">
+              <Text className="block text-sm font-medium text-gray-700 mb-2">投票截止时间</Text>
+              <Input
+                type="datetime-local"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                value={voteSetting.voteDeadline}
+                onInput={(e: any) => setVoteSetting(prev => ({ ...prev, voteDeadline: e.detail.value }))}
+              />
+              <Text className="block text-xs text-gray-400 mt-1">截止时间到达后，未投票者视为弃权</Text>
+            </View>
+
+            {/* 确认按钮 */}
+            <Button
+              className="w-full py-3 bg-blue-500 text-white rounded-xl font-medium"
+              onClick={handleConfirmVote}
+            >
+              <Text className="text-white">创建投票</Text>
+            </Button>
+          </View>
+        </DialogContent>
+      </Dialog>
     </View>
   )
 }

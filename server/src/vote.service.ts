@@ -46,9 +46,12 @@ export class VoteService {
     title: string
     creatorName?: string
     inspirationPoints: InspirationPoint[]
-    expiresDays?: number // 过期天数，默认7天
-  }): Promise<{ shareCode: string; sessionId: string }> {
-    const { tripId, title, creatorName, inspirationPoints, expiresDays = 7 } = params
+    startDate?: string // 旅行开始日期 YYYY-MM-DD
+    endDate?: string   // 旅行结束日期 YYYY-MM-DD（可以和开始日期相同）
+    meetupPlace?: string[] // 集合地点标签数组
+    voteDeadline?: string  // 投票截止时间 ISO8601 格式
+  }): Promise<{ shareCode: string; sessionId: string; voteDeadline: string }> {
+    const { tripId, title, creatorName, inspirationPoints, startDate, endDate, meetupPlace, voteDeadline } = params
     const client = this.client
 
     // 生成唯一分享码
@@ -66,11 +69,17 @@ export class VoteService {
       attempts++
     }
 
-    // 计算过期时间
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + expiresDays)
-
     const sessionId = uuidv4()
+    
+    // 处理投票截止时间
+    let deadline: Date
+    if (voteDeadline) {
+      deadline = new Date(voteDeadline)
+    } else {
+      // 默认截止时间：7天后
+      deadline = new Date()
+      deadline.setDate(deadline.getDate() + 7)
+    }
 
     const { error } = await client
       .from('vote_sessions')
@@ -81,7 +90,10 @@ export class VoteService {
         title,
         creator_name: creatorName || '旅行达人',
         inspirationPoints: inspirationPoints,
-        expires_at: expiresAt.toISOString(),
+        start_date: startDate,
+        end_date: endDate,
+        meetup_place: meetupPlace || [],
+        vote_deadline: deadline.toISOString(),
       })
 
     if (error) {
@@ -89,8 +101,8 @@ export class VoteService {
       throw new Error(`创建投票会话失败: ${error.message}`)
     }
 
-    console.log(`[VoteService] 创建投票会话成功: ${shareCode}`)
-    return { shareCode, sessionId }
+    console.log(`[VoteService] 创建投票会话成功: ${shareCode}, 截止时间: ${deadline.toISOString()}`)
+    return { shareCode, sessionId, voteDeadline: deadline.toISOString() }
   }
 
   /**
@@ -102,13 +114,17 @@ export class VoteService {
     title: string
     creatorName: string
     inspirationPoints: InspirationPoint[]
-    expiresAt: string
+    startDate?: string
+    endDate?: string
+    meetupPlace?: string[]
+    voteDeadline: string
+    isExpired: boolean // 投票是否已截止
   } | null> {
     const client = this.client
 
     const { data, error } = await client
       .from('vote_sessions')
-      .select('id, trip_id, title, creator_name, inspirationPoints, expires_at')
+      .select('id, trip_id, title, creator_name, inspirationPoints, start_date, end_date, meetup_place, vote_deadline')
       .eq('share_code', shareCode)
       .maybeSingle()
 
@@ -119,10 +135,9 @@ export class VoteService {
 
     if (!data) return null
 
-    // 检查是否过期
-    if (new Date(data.expires_at) < new Date()) {
-      return null
-    }
+    const now = new Date()
+    const deadline = new Date(data.vote_deadline)
+    const isExpired = now > deadline
 
     return {
       sessionId: data.id,
@@ -130,7 +145,11 @@ export class VoteService {
       title: data.title,
       creatorName: data.creator_name,
       inspirationPoints: data.inspirationPoints,
-      expiresAt: data.expires_at,
+      startDate: data.start_date,
+      endDate: data.end_date,
+      meetupPlace: data.meetup_place || [],
+      voteDeadline: data.vote_deadline,
+      isExpired,
     }
   }
 

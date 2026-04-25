@@ -15,14 +15,20 @@ export class VoteController {
     title: string
     creatorName?: string
     inspirationPoints: InspirationPoint[]
-    expiresDays?: number
+    startDate?: string // 旅行开始日期 YYYY-MM-DD
+    endDate?: string   // 旅行结束日期 YYYY-MM-DD
+    meetupPlace?: string[] // 集合地点标签数组
+    voteDeadline?: string  // 投票截止时间 ISO8601 格式
   }) {
     const result = await this.voteService.createSession({
       tripId: body.tripId,
       title: body.title,
       creatorName: body.creatorName,
       inspirationPoints: body.inspirationPoints,
-      expiresDays: body.expiresDays || 7,
+      startDate: body.startDate,
+      endDate: body.endDate,
+      meetupPlace: body.meetupPlace,
+      voteDeadline: body.voteDeadline,
     })
 
     return {

@@ -3,9 +3,9 @@ import { Input as TaroInput, View } from "@tarojs/components"
 import { cn } from "@/lib/utils"
 
 export interface InputProps
-  extends React.ComponentPropsWithoutRef<typeof TaroInput> {
+  extends Omit<React.ComponentPropsWithoutRef<typeof TaroInput>, 'type'> {
   className?: string
-  type?: React.ComponentProps<typeof TaroInput>['type']
+  type?: any
   autoFocus?: boolean
 }
 

@@ -3,7 +3,7 @@ import Taro from '@tarojs/taro'
 import { View, Text, Image } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Network } from '@/network'
-import { ThumbsUp, ThumbsDown, Clock, Users, ArrowLeft } from 'lucide-react-taro'
+import { ThumbsUp, ThumbsDown, Clock, Users, ArrowLeft, MapPin, Calendar } from 'lucide-react-taro'
 import './index.config'
 
 interface InspirationPoint {
@@ -23,7 +23,11 @@ interface Session {
   title: string
   creatorName: string
   inspirationPoints: InspirationPoint[]
-  expiresAt: string
+  startDate?: string
+  endDate?: string
+  meetupPlace?: string[]
+  voteDeadline: string
+  isExpired: boolean
 }
 
 interface VoteResult {
@@ -44,6 +48,7 @@ export default function VotePage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [shareCode, setShareCode] = useState('')
+  const [showResults, setShowResults] = useState(false)
 
   // 获取分享码
   useEffect(() => {
@@ -68,9 +73,18 @@ export default function VotePage() {
       console.log('[VotePage] 获取会话响应:', res.data)
       
       if (res.data.code === 200 && res.data.data) {
-        setSession(res.data.data)
-        // 加载投票结果
-        loadResults(res.data.data.sessionId)
+        const sessionData = res.data.data
+        setSession(sessionData)
+        
+        // 检查是否已经投过票
+        if (sessionData.isExpired) {
+          // 已截止，直接显示结果
+          setShowResults(true)
+          loadResults(sessionData.sessionId)
+        } else {
+          // 未截止，加载投票结果检查是否已投票
+          loadResults(sessionData.sessionId)
+        }
       } else {
         setError(res.data.msg || '投票链接已失效')
       }
@@ -85,7 +99,6 @@ export default function VotePage() {
   // 加载投票结果
   const loadResults = async (sessionId: string) => {
     try {
-      // 获取当前用户的 openid（如果有）
       const userInfo = Taro.getStorageSync('userInfo')
       const openid = userInfo?.openid
       
@@ -121,7 +134,7 @@ export default function VotePage() {
 
   // 投票
   const handleVote = (inspirationId: string, value: number) => {
-    if (submitted) return
+    if (submitted || session?.isExpired) return
     
     setVotes(prev => ({
       ...prev,
@@ -152,7 +165,6 @@ export default function VotePage() {
     try {
       setSubmitting(true)
       
-      // 获取用户信息
       const userInfo = Taro.getStorageSync('userInfo')
       const openid = userInfo?.openid
       const nickname = userInfo?.nickname || '微信用户'
@@ -173,8 +185,8 @@ export default function VotePage() {
       
       if (res.data.code === 200) {
         setSubmitted(true)
+        setShowResults(true)
         Taro.showToast({ title: '投票成功！', icon: 'success' })
-        // 刷新结果
         loadResults(session.sessionId)
       } else {
         Taro.showToast({ title: res.data.msg || '提交失败', icon: 'none' })
@@ -209,9 +221,16 @@ export default function VotePage() {
     }
   }
 
+  // 格式化日期
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    return `${date.getMonth() + 1}月${date.getDate()}日`
+  }
+
   // 渲染投票按钮
   const renderVoteButton = (inspirationId: string, currentVote: number) => {
-    if (submitted) {
+    if (session?.isExpired || submitted) {
       const result = results[inspirationId]
       return (
         <View className="flex items-center gap-4 text-sm">
@@ -232,9 +251,7 @@ export default function VotePage() {
         <Button
           size="sm"
           className={`px-3 py-1 rounded-full text-sm ${
-            currentVote === 1 
-              ? 'bg-green-500 text-white' 
-              : 'bg-gray-100 text-gray-600'
+            currentVote === 1 ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600'
           }`}
           onClick={() => handleVote(inspirationId, 1)}
         >
@@ -244,9 +261,7 @@ export default function VotePage() {
         <Button
           size="sm"
           className={`px-3 py-1 rounded-full text-sm ${
-            currentVote === -1 
-              ? 'bg-red-500 text-white' 
-              : 'bg-gray-100 text-gray-600'
+            currentVote === -1 ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-600'
           }`}
           onClick={() => handleVote(inspirationId, -1)}
         >
@@ -273,7 +288,7 @@ export default function VotePage() {
           />
         </View>
         <Text className="block text-xs text-gray-400 mt-1 text-right">
-          {result.percentage}% 赞成
+          {result.percentage}% 赞成 ({result.likes + result.dislikes}人投票)
         </Text>
       </View>
     )
@@ -322,14 +337,56 @@ export default function VotePage() {
             <Users size={14} color="#6B7280" />
             <Text>{session?.creatorName}</Text>
           </View>
-          <View className="flex items-center gap-1">
-            <Clock size={14} color="#6B7280" />
-            <Text>7天有效</Text>
-          </View>
+          {session?.isExpired && (
+            <View className="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-full">
+              <Clock size={12} color="#EF4444" />
+              <Text className="text-xs text-red-500">已截止</Text>
+            </View>
+          )}
         </View>
       </View>
 
-      {/* 提示 */}
+      {/* 旅行信息 */}
+      {(session?.startDate || session?.meetupPlace?.length) && (
+        <View className="bg-white mx-4 mt-3 p-4 rounded-2xl shadow-sm">
+          {session?.startDate && (
+            <View className="flex items-center mb-2">
+              <Calendar size={16} color="#3B82F6" className="mr-2" />
+              <Text className="text-sm text-gray-700">
+                旅行日期：{formatDate(session.startDate)}
+                {session.endDate && session.endDate !== session.startDate && ` 至 ${formatDate(session.endDate)}`}
+              </Text>
+            </View>
+          )}
+          {session?.meetupPlace && session.meetupPlace.length > 0 && (
+            <View className="flex items-center flex-wrap gap-2">
+              <MapPin size={16} color="#3B82F6" />
+              {session.meetupPlace.map((place, index) => (
+                <View key={index} className="px-2 py-1 bg-blue-50 rounded-full">
+                  <Text className="text-xs text-blue-600">{place}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* 截止时间提示 */}
+      {!session?.isExpired && (
+        <View className="mx-4 mt-3 p-3 bg-orange-50 rounded-xl border border-orange-200">
+          <View className="flex items-center">
+            <Clock size={16} color="#F59E0B" className="mr-2" />
+            <Text className="text-sm text-orange-600">
+              投票截止：{new Date(session?.voteDeadline || '').toLocaleString('zh-CN')}
+            </Text>
+          </View>
+          <Text className="text-xs text-orange-500 mt-1">
+            截止时间到达后，未投票者视为弃权
+          </Text>
+        </View>
+      )}
+
+      {/* 状态提示 */}
       {submitted && (
         <View className="mx-4 mt-3 p-3 bg-green-50 rounded-xl border border-green-200">
           <Text className="block text-green-600 text-sm text-center">
@@ -338,11 +395,16 @@ export default function VotePage() {
         </View>
       )}
 
-      {!submitted && (
-        <View className="mx-4 mt-3 p-3 bg-blue-50 rounded-xl border border-blue-200">
-          <Text className="block text-blue-600 text-sm text-center">
-            点击下方按钮为每个灵感点投票，完成后提交
-          </Text>
+      {/* 切换查看结果 */}
+      {submitted && !session?.isExpired && (
+        <View className="mx-4 mt-3">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => setShowResults(!showResults)}
+          >
+            <Text>{showResults ? '返回投票' : '查看投票结果'}</Text>
+          </Button>
         </View>
       )}
 
@@ -398,7 +460,7 @@ export default function VotePage() {
       </View>
 
       {/* 底部提交按钮 */}
-      {!submitted && (
+      {!submitted && !session?.isExpired && (
         <View 
           style={{
             position: 'fixed', bottom: 0, left: 0, right: 0,
@@ -412,9 +474,7 @@ export default function VotePage() {
             </Text>
             <Button
               className={`w-full py-3 rounded-xl text-white font-medium ${
-                submitting || votedCount === 0 
-                  ? 'bg-gray-300' 
-                  : 'bg-blue-500'
+                submitting || votedCount === 0 ? 'bg-gray-300' : 'bg-blue-500'
               }`}
               disabled={submitting || votedCount === 0}
               onClick={handleSubmit}

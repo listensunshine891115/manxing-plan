@@ -4,8 +4,6 @@ import { sql } from "drizzle-orm"
 // PostgreSQL gen_random_uuid() 函数
 const gen_random_uuid = () => sql`gen_random_uuid()`
 
-
-
 export const votes = pgTable("votes", {
 	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
 	tripId: varchar("trip_id", { length: 36 }).notNull(),
@@ -111,7 +109,7 @@ export const voteSessions = pgTable("vote_sessions", {
 	shareCode: varchar("share_code", { length: 16 }).notNull(),
 	title: varchar({ length: 255 }).notNull(),
 	creatorName: varchar("creator_name", { length: 50 }),
-	inspirationPoints: jsonb("inspirationPoints").notNull(),
+	inspirationPoints: jsonb().notNull(),
 	expiresAt: timestamp("expires_at", { withTimezone: true, mode: 'string' }),
 	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
