@@ -5,7 +5,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ArrowLeft, CalendarDays, CalendarRange, Car, Bus, MapPin, Search, X, ChevronRight, ChevronLeft, Loader, Users, Wand, Check } from 'lucide-react-taro'
-import { format, differenceInDays, addDays } from 'date-fns'
+import { format, differenceInDays, addDays, startOfDay, isBefore } from 'date-fns'
 import { Network } from '@/network'
 import Taro from '@tarojs/taro'
 import './index.css'
@@ -285,7 +285,7 @@ export default function Generate() {
                   setShowStartPicker(false)
                 }
               }}
-              disabled={(date) => date < new Date()}
+              disabled={(date) => isBefore(date, startOfDay(new Date()))}
             />
           </View>
         </View>
@@ -307,7 +307,7 @@ export default function Generate() {
                   }
                 }
               }}
-              disabled={(date) => date < startDate}
+              disabled={(date) => isBefore(date, startOfDay(startDate))}
             />
           </View>
         </View>
