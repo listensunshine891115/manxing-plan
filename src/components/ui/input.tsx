@@ -2,22 +2,63 @@ import * as React from "react"
 import { Input as TaroInput, View } from "@tarojs/components"
 import { cn } from "@/lib/utils"
 
-export interface InputProps
-  extends Omit<React.ComponentPropsWithoutRef<typeof TaroInput>, 'type'> {
+export interface InputProps {
   className?: string
-  type?: any
+  type?: string
   autoFocus?: boolean
   min?: string
+  value?: string
+  placeholder?: string
+  disabled?: boolean
+  focus?: boolean
+  onFocus?: (e: any) => void
+  onBlur?: (e: any) => void
+  onInput?: (e: any) => void
+  onChange?: (e: any) => void
+  onConfirm?: () => void
+  [key: string]: any
 }
 
-const Input = React.forwardRef<React.ElementRef<typeof TaroInput>, InputProps>(
-  ({ className, type, autoFocus, focus, onFocus, onBlur, ...props }, ref) => {
+const Input = React.forwardRef<any, InputProps>(
+  (props, ref) => {
+    const { className, type, autoFocus, focus, onFocus, onBlur, onChange, onInput, min, value, placeholder, disabled, ...rest } = props
     const [isFocused, setIsFocused] = React.useState(false)
-    const disabled = !!(props as any).disabled
 
     React.useEffect(() => {
       if (autoFocus || focus) setIsFocused(true)
     }, [autoFocus, focus])
+
+    // 构建传递给 TaroInput 的属性
+    const inputProps: any = {
+      type,
+      className: "w-full flex-1 bg-transparent text-sm text-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 selection:bg-selection selection:text-selection-foreground",
+      placeholderClass: "text-muted-foreground",
+      ref,
+      focus: autoFocus || focus,
+      value,
+      placeholder,
+      disabled,
+      onFocus: (e: any) => {
+        setIsFocused(true)
+        onFocus?.(e)
+      },
+      onBlur: (e: any) => {
+        setIsFocused(false)
+        onBlur?.(e)
+      },
+      onInput,
+      ...rest,
+    }
+    
+    // 添加 onChange 支持
+    if (onChange) {
+      inputProps.onChange = onChange
+    }
+    
+    // 添加 min 支持
+    if (min) {
+      inputProps.min = min
+    }
 
     return (
       <View
@@ -32,22 +73,7 @@ const Input = React.forwardRef<React.ElementRef<typeof TaroInput>, InputProps>(
           setIsFocused(true)
         }}
       >
-        <TaroInput
-          type={type}
-          className="w-full flex-1 bg-transparent text-sm text-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 selection:bg-selection selection:text-selection-foreground"
-          placeholderClass="text-muted-foreground"
-          ref={ref}
-          focus={autoFocus || focus}
-          onFocus={(e) => {
-            setIsFocused(true)
-            onFocus?.(e)
-          }}
-          onBlur={(e) => {
-            setIsFocused(false)
-            onBlur?.(e)
-          }}
-          {...props}
-        />
+        <TaroInput {...inputProps} />
       </View>
     )
   }

@@ -613,8 +613,8 @@ export default function Route() {
                   <Input
                     type="date"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                    value={voteSetting.startDate.split('T')[0] || ''}
-                    onInput={(e: any) => setVoteSetting(prev => ({ 
+                    value={voteSetting.startDate.split('T')[0]}
+                    onChange={(e: any) => setVoteSetting(prev => ({ 
                       ...prev, 
                       startDate: e.detail.value + 'T' + (prev.startDate.split('T')[1] || '09:00'),
                     }))}
@@ -626,10 +626,10 @@ export default function Route() {
                   <Input
                     type="time"
                     className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm text-center"
-                    value={voteSetting.startDate.split('T')[1] || '09:00'}
-                    onInput={(e: any) => setVoteSetting(prev => ({ 
+                    value={voteSetting.startDate.split('T')[1]}
+                    onChange={(e: any) => setVoteSetting(prev => ({ 
                       ...prev, 
-                      startDate: (prev.startDate.split('T')[0] || e.detail.value) + 'T' + e.detail.value,
+                      startDate: (prev.startDate.split('T')[0]) + 'T' + e.detail.value,
                     }))}
                     placeholder="时间"
                   />
@@ -641,9 +641,9 @@ export default function Route() {
                   <Input
                     type="date"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                    value={voteSetting.endDate.split('T')[0] || ''}
-                    min={voteSetting.startDate.split('T')[0] || undefined}
-                    onInput={(e: any) => setVoteSetting(prev => ({ 
+                    value={voteSetting.endDate.split('T')[0]}
+                    min={voteSetting.startDate.split('T')[0]}
+                    onChange={(e: any) => setVoteSetting(prev => ({ 
                       ...prev, 
                       endDate: e.detail.value + 'T' + (prev.endDate.split('T')[1] || '18:00'),
                     }))}
@@ -655,10 +655,10 @@ export default function Route() {
                   <Input
                     type="time"
                     className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm text-center"
-                    value={voteSetting.endDate.split('T')[1] || '18:00'}
-                    onInput={(e: any) => setVoteSetting(prev => ({ 
+                    value={voteSetting.endDate.split('T')[1]}
+                    onChange={(e: any) => setVoteSetting(prev => ({ 
                       ...prev, 
-                      endDate: (prev.endDate.split('T')[0] || e.detail.value) + 'T' + e.detail.value,
+                      endDate: (prev.endDate.split('T')[0]) + 'T' + e.detail.value,
                     }))}
                     placeholder="时间"
                   />
