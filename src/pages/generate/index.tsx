@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Picker } from '@tarojs/components'
+import { View, Text, Picker, Map } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
@@ -120,6 +120,9 @@ export default function Generate() {
   const [meetingCoords, setMeetingCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [searchResults, setSearchResults] = useState<PlaceResult[]>([])
   const [showSearch, setShowSearch] = useState(false)
+  const [showMapPicker, setShowMapPicker] = useState(false)
+  const [mapCenter, setMapCenter] = useState({ latitude: 39.908823, longitude: 116.397470 }) // 默认北京天安门
+  const [mapMarkers, setMapMarkers] = useState<any[]>([])
   const [searching, setSearching] = useState(false)
   const [inputValue, setInputValue] = useState('')
 
@@ -212,39 +215,80 @@ export default function Generate() {
     setSearchResults([])
   }
 
-  // 从外部地图选择地点（获取当前位置作为参考）
+  // 打开内置地图选择器
   const openExternalMap = async () => {
-    // 直接获取定位
+    // 先尝试获取当前位置作为地图中心
     try {
       const res = await Taro.getLocation({
         type: 'gcj02'
       })
-      const { latitude, longitude } = res
-      // 保存坐标
-      setMeetingCoords({ lat: latitude, lng: longitude })
-      Taro.showToast({ 
-        title: '已获取当前位置坐标', 
-        icon: 'success',
-        duration: 1500
+      setMapCenter({
+        latitude: res.latitude,
+        longitude: res.longitude
       })
+      setMapMarkers([{
+        id: 1,
+        latitude: res.latitude,
+        longitude: res.longitude,
+        width: 30,
+        height: 30
+      }])
     } catch (err) {
       console.log('[Generate] getLocation error:', err)
-      // 检查是否是授权问题
-      if (err.errMsg && err.errMsg.includes('auth deny')) {
-        Taro.showModal({
-          title: '定位失败',
-          content: '请在小程序设置中开启位置权限：\n我 → 设置 → 通用 → 功能 → 位置服务',
-          showCancel: false,
-          confirmText: '知道了'
+      // 如果获取定位失败，使用默认位置（城市中心），让用户手动拖动选择
+      // 默认使用厦门市中心
+      setMapCenter({ latitude: 24.4798, longitude: 118.0894 })
+      setMapMarkers([{
+        id: 1,
+        latitude: 24.4798,
+        longitude: 118.0894,
+        width: 30,
+        height: 30
+      }])
+    }
+    setShowMapPicker(true)
+  }
+
+  // 在地图上选择位置
+  const handleMapTap = async (e: any) => {
+    const { latitude, longitude } = e.detail
+    setMapCenter({ latitude, longitude })
+    setMapMarkers([{
+      id: 1,
+      latitude,
+      longitude,
+      width: 30,
+      height: 30
+    }])
+  }
+
+  // 确认地图选择的位置
+  const confirmMapLocation = async () => {
+    if (mapMarkers.length > 0) {
+      const marker = mapMarkers[0]
+      setMeetingCoords({ lat: marker.latitude, lng: marker.longitude })
+      
+      // 尝试逆地址解析获取地点名称
+      try {
+        const res = await Network.request({
+          url: '/api/location/reverse',
+          method: 'POST',
+          data: {
+            lat: marker.latitude,
+            lng: marker.longitude
+          }
         })
-      } else {
-        Taro.showToast({ 
-          title: '定位失败，请检查网络', 
-          icon: 'none',
-          duration: 2000
-        })
+        if (res.data?.data?.address) {
+          setMeetingPoint(res.data.data.address)
+        } else {
+          setMeetingPoint(`${marker.latitude.toFixed(4)}, ${marker.longitude.toFixed(4)}`)
+        }
+      } catch (err) {
+        // 如果解析失败，使用坐标作为名称
+        setMeetingPoint(`${marker.latitude.toFixed(4)}, ${marker.longitude.toFixed(4)}`)
       }
     }
+    setShowMapPicker(false)
   }
 
   // 清除集合地点
@@ -800,6 +844,107 @@ export default function Generate() {
 
       {/* 日期选择弹窗 */}
       {renderDatePickers()}
+
+      {/* 地图选择弹窗 */}
+      {showMapPicker && (
+        <View 
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
+            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end'
+          }}
+          onClick={() => setShowMapPicker(false)}
+        >
+          <View 
+            style={{ 
+              backgroundColor: '#fff', 
+              borderRadius: '16px 16px 0 0',
+              maxHeight: '80vh'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 弹窗头部 */}
+            <View style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '16px', borderBottom: '1px solid #e5e5e5'
+            }}
+            >
+              <Text className="block text-base font-medium">选择集合地点</Text>
+              <View onClick={() => setShowMapPicker(false)}>
+                <X size={20} color="#64748b" />
+              </View>
+            </View>
+            
+            {/* 提示文字 */}
+            <View style={{ padding: '12px 16px', backgroundColor: '#f8fafc' }}>
+              <Text className="block text-sm text-gray-600">
+                在地图上点击或拖动选择位置，然后点击&quot;确认选择&quot;
+              </Text>
+            </View>
+
+            {/* 地图组件 - 仅在小程序端显示 */}
+            {Taro.getEnv() === Taro.ENV_TYPE.WEAPP || Taro.getEnv() === Taro.ENV_TYPE.TT ? (
+              <View>
+                <Map
+                  style={{ width: '100%', height: '400px' }}
+                  latitude={mapCenter.latitude}
+                  longitude={mapCenter.longitude}
+                  markers={mapMarkers}
+                  onClick={handleMapTap}
+                  onError={() => {}}
+                  showLocation
+                  enablePoi
+                  enableBuilding
+                />
+                {/* 当前坐标显示 */}
+                <View style={{ padding: '12px 16px', backgroundColor: '#fff' }}>
+                  <Text className="block text-sm text-gray-500">
+                    当前选择位置：{mapCenter.latitude.toFixed(6)}, {mapCenter.longitude.toFixed(6)}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              /* H5 端提示 */
+              <View
+                style={{
+                  padding: '40px 20px',
+                  backgroundColor: '#f8fafc',
+                  textAlign: 'center'
+                }}
+              >
+                <MapPin size={48} color="#cbd5e1" style={{ margin: '0 auto 16px' }} />
+                <Text className="block text-sm text-gray-500">
+                  地图选点功能仅在小程序中可用
+                </Text>
+                <Text className="block text-xs text-gray-400 mt-2">
+                  请使用搜索功能查找地点
+                </Text>
+              </View>
+            )}
+
+            {/* 底部按钮 */}
+            <View style={{
+              display: 'flex', gap: '12px', padding: '16px',
+              paddingBottom: 'max(16px, env(safe-area-inset-bottom))'
+            }}
+            >
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => setShowMapPicker(false)}
+              >
+                取消
+              </Button>
+              <Button 
+                className="flex-1 bg-blue-500"
+                onClick={confirmMapLocation}
+              >
+                确认选择
+              </Button>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   )
 }

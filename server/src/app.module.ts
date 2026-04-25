@@ -12,10 +12,11 @@ import { VideoParseService } from '@/video-parse.service'
 import { MapService } from '@/map.service'
 import { VoteController } from '@/vote.controller'
 import { VoteService } from '@/vote.service'
+import { LocationController } from '@/location.controller'
 
 @Module({
   imports: [],
-  controllers: [AppController, TripController, MessageController, VoteController],
+  controllers: [AppController, TripController, MessageController, VoteController, LocationController],
   providers: [
     AppService,
     TripService,
