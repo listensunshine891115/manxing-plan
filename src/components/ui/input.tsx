@@ -31,12 +31,30 @@ const Input = React.forwardRef<any, InputProps>(
     // date/time 类型使用原生样式，不添加额外包装
     const isDateTimeType = type === 'date' || type === 'time' || type === 'datetime-local'
 
+    // 日期时间类型直接返回 TaroInput，不添加额外包装
+    if (isDateTimeType) {
+      const dateTimeProps: any = {
+        type,
+        className: className || "w-full bg-transparent text-sm",
+        ref,
+        value,
+        placeholder,
+        disabled,
+        focus,
+        onFocus,
+        onBlur,
+        onInput,
+        min,
+        ...rest,
+      }
+      if (onChange) dateTimeProps.onChange = onChange
+      return <TaroInput {...dateTimeProps} />
+    }
+
     // 构建传递给 TaroInput 的属性
     const inputProps: any = {
       type,
-      className: isDateTimeType 
-        ? "w-full bg-transparent text-sm"  // 日期时间类型使用简化样式
-        : "w-full flex-1 bg-transparent text-sm text-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 selection:bg-selection selection:text-selection-foreground",
+      className: "w-full flex-1 bg-transparent text-sm text-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 selection:bg-selection selection:text-selection-foreground",
       placeholderClass: "text-muted-foreground",
       ref,
       focus: autoFocus || focus,
@@ -58,16 +76,6 @@ const Input = React.forwardRef<any, InputProps>(
     // 添加 onChange 支持
     if (onChange) {
       inputProps.onChange = onChange
-    }
-    
-    // 添加 min 支持
-    if (min) {
-      inputProps.min = min
-    }
-
-    // 日期时间类型直接返回 TaroInput，不添加额外包装
-    if (isDateTimeType) {
-      return <TaroInput {...inputProps} />
     }
 
     return (
