@@ -413,13 +413,13 @@ export default function Generate() {
         <Text className="block text-sm text-blue-500">返回</Text>
       </View>
 
-      {/* 起始时间 */}
+      {/* 出发时间 */}
       <View className="bg-white rounded-xl p-4 shadow-sm">
         <View className="flex items-center mb-3">
           <View className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
             <CalendarDays size={16} color="#3b82f6" />
           </View>
-          <Text className="block text-sm font-medium text-gray-900 ml-2">起始时间</Text>
+          <Text className="block text-sm font-medium text-gray-900 ml-2">出发时间</Text>
         </View>
         <Button 
           variant="outline" 
@@ -446,13 +446,13 @@ export default function Generate() {
         </View>
       </View>
 
-      {/* 结束时间 */}
+      {/* 返程时间 */}
       <View className="bg-white rounded-xl p-4 shadow-sm">
         <View className="flex items-center mb-3">
           <View className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
             <CalendarRange size={16} color="#3b82f6" />
           </View>
-          <Text className="block text-sm font-medium text-gray-900 ml-2">结束时间</Text>
+          <Text className="block text-sm font-medium text-gray-900 ml-2">返程时间</Text>
           <Text className="block text-xs text-gray-400 ml-auto">共 {tripDays} 天</Text>
         </View>
         <Button 
