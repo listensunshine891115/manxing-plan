@@ -55,6 +55,8 @@ interface RoutePlanResult {
     startTime?: string
     endTime?: string
     transportMode?: 'public' | 'self-drive'
+    // 投票截止时间
+    voteDeadline?: string
   }
 }
 
@@ -160,7 +162,8 @@ export default function Confirm() {
             inspirationPoints: inspirationPoints,
             startDate: routePlan.settings.startDate,
             endDate: routePlan.settings.days > 1 ? routePlan.settings.startDate : undefined,
-            meetupPlace: meetupPlaces.length > 0 ? meetupPlaces : undefined
+            meetupPlace: meetupPlaces.length > 0 ? meetupPlaces : undefined,
+            voteDeadline: routePlan.settings.voteDeadline
           }
         })
 

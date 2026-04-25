@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { ArrowLeft, CalendarDays, CalendarRange, Car, Bus, MapPin, Search, X, ChevronRight, ChevronLeft, Loader, Users, Wand, Check } from 'lucide-react-taro'
+import { ArrowLeft, CalendarDays, CalendarRange, Car, Bus, MapPin, Search, X, ChevronRight, ChevronLeft, Loader, Users, Wand, Check, Clock } from 'lucide-react-taro'
 import { format, differenceInDays, addDays, startOfDay, isBefore } from 'date-fns'
 import { Network } from '@/network'
 import Taro from '@tarojs/taro'
@@ -74,6 +74,8 @@ interface RoutePlanResult {
     startTime?: string
     endTime?: string
     transportMode?: 'public' | 'self-drive'
+    // 投票截止时间
+    voteDeadline?: string
   }
 }
 
@@ -90,6 +92,12 @@ export default function Generate() {
   const [transportMode, setTransportMode] = useState<'public' | 'self-drive'>('public')
   const [showStartPicker, setShowStartPicker] = useState(false)
   const [showEndPicker, setShowEndPicker] = useState(false)
+  // 投票截止日期（默认设置为出发前1天的18:00）
+  const [voteDeadline, setVoteDeadline] = useState<Date>(() => {
+    const deadline = addDays(new Date(), 1)
+    deadline.setHours(18, 0, 0, 0)
+    return deadline
+  })
 
   // 计算行程天数
   const tripDays = differenceInDays(endDate, startDate) + 1
@@ -349,6 +357,8 @@ export default function Generate() {
         result.settings.startTime = startTime
         result.settings.endTime = endTime
         result.settings.transportMode = transportMode
+        // 保存投票截止时间
+        result.settings.voteDeadline = voteDeadline.toISOString()
 
         await Taro.setStorage({ key: 'routePlanResult', data: result })
         Taro.navigateTo({ url: '/pages/confirm/index' })
@@ -741,6 +751,53 @@ export default function Generate() {
             )}
           </View>
         )}
+      </View>
+
+      {/* 投票截止日期 */}
+      <View className="bg-white rounded-xl p-4 shadow-sm">
+        <View className="flex items-center mb-3">
+          <View className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+            <Clock size={16} color="#f59e0b" />
+          </View>
+          <Text className="block text-sm font-medium text-gray-900 ml-2">投票截止时间</Text>
+          <Text className="block text-xs text-gray-400 ml-auto">精确到小时</Text>
+        </View>
+        <View className="flex items-center gap-2">
+          <Picker
+            mode="date"
+            value={format(voteDeadline, 'yyyy-MM-dd')}
+            start={format(new Date(), 'yyyy-MM-dd')}
+            end="2030-12-31"
+            onChange={(e: any) => {
+              const [year, month, day] = e.detail.value.split('-')
+              const newDeadline = new Date(voteDeadline)
+              newDeadline.setFullYear(parseInt(year), parseInt(month) - 1, parseInt(day))
+              setVoteDeadline(newDeadline)
+            }}
+          >
+            <View className="flex-1 px-4 py-2 bg-gray-50 rounded-lg">
+              <Text className="block text-sm text-gray-900">{format(voteDeadline, 'yyyy-MM-dd')}</Text>
+            </View>
+          </Picker>
+          <Picker
+            mode="selector"
+            range={Array.from({ length: 24 }, (_, i) => ({ value: i, label: `${i.toString().padStart(2, '0')}:00` }))}
+            rangeKey="label"
+            value={voteDeadline.getHours()}
+            onChange={(e: any) => {
+              const newDeadline = new Date(voteDeadline)
+              newDeadline.setHours(e.detail.value, 0, 0, 0)
+              setVoteDeadline(newDeadline)
+            }}
+          >
+            <View className="px-4 py-2 bg-gray-50 rounded-lg">
+              <Text className="block text-sm text-gray-900">{format(voteDeadline, 'HH:00')}</Text>
+            </View>
+          </Picker>
+        </View>
+        <Text className="block text-xs text-gray-400 mt-2">
+          截止时间到达后，未投票者视为弃权
+        </Text>
       </View>
     </View>
   )

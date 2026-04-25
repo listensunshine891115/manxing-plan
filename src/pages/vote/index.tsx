@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import Taro from '@tarojs/taro'
+import Taro, { useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import { View, Text, Image } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Network } from '@/network'
-import { ThumbsUp, ThumbsDown, Clock, Users, ArrowLeft, MapPin, Calendar } from 'lucide-react-taro'
+import { ThumbsUp, ThumbsDown, Clock, Users, ArrowLeft, MapPin, Calendar, Share2 } from 'lucide-react-taro'
 import './index.config'
 
 interface InspirationPoint {
@@ -209,6 +209,32 @@ export default function VotePage() {
     }
   }
 
+  // 分享给好友
+  const handleShare = () => {
+    // 显示分享菜单
+    Taro.showShareMenu({
+      withShareTicket: true
+    })
+  }
+
+  // 配置分享给好友
+  useShareAppMessage(() => {
+    return {
+      title: session?.title || '快来参与旅行投票',
+      path: `/pages/vote/index?code=${shareCode}`,
+      imageUrl: ''
+    }
+  })
+
+  // 配置分享到朋友圈
+  useShareTimeline(() => {
+    return {
+      title: session?.title || '快来参与旅行投票',
+      query: `code=${shareCode}`,
+      imageUrl: ''
+    }
+  })
+
   // 获取分类图标
   const getCategoryIcon = (tag?: string) => {
     switch (tag) {
@@ -325,7 +351,13 @@ export default function VotePage() {
             <ArrowLeft size={20} color="#374151" />
           </View>
           <Text className="text-lg font-semibold text-gray-800">同伴投票</Text>
-          <View className="w-10" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleShare}
+          >
+            <Share2 size={20} color="#3B82F6" />
+          </Button>
         </View>
       </View>
 
@@ -459,15 +491,27 @@ export default function VotePage() {
         ))}
       </View>
 
-      {/* 底部提交按钮 */}
-      {!submitted && !session?.isExpired && (
-        <View 
-          style={{
-            position: 'fixed', bottom: 0, left: 0, right: 0,
-            backgroundColor: '#fff', borderTop: '1px solid #e5e5e5',
-            padding: '16px', paddingBottom: '32px', zIndex: 100
-          }}
-        >
+      {/* 底部操作栏 */}
+      <View 
+        style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          backgroundColor: '#fff', borderTop: '1px solid #e5e5e5',
+          padding: '16px', paddingBottom: '32px', zIndex: 100
+        }}
+      >
+        {/* 分享给好友按钮 */}
+        <View className="mx-4 mb-3">
+          <Button
+            className="w-full py-3 rounded-xl bg-green-500 text-white font-medium"
+            onClick={handleShare}
+          >
+            <Share2 size={18} color="#ffffff" className="mr-2" />
+            <Text className="text-white">分享给微信好友邀请投票</Text>
+          </Button>
+        </View>
+        
+        {/* 提交投票按钮 */}
+        {!submitted && !session?.isExpired && (
           <View className="mx-4">
             <Text className="block text-sm text-gray-500 text-center mb-2">
               已投票 {votedCount}/{totalCount} 个灵感点
@@ -482,11 +526,11 @@ export default function VotePage() {
               <Text className="text-white">{submitting ? '提交中...' : '提交投票'}</Text>
             </Button>
           </View>
-          <Text className="block text-xs text-gray-400 text-center mt-2">
-            提交后无法修改
-          </Text>
-        </View>
-      )}
+        )}
+        <Text className="block text-xs text-gray-400 text-center mt-2">
+          提交后无法修改
+        </Text>
+      </View>
     </View>
   )
 }
