@@ -79,7 +79,7 @@ export class ImageParseController {
       }
     }
 
-    const result = await this.imageParseService.parseImageFromUrl(body.imageUrl)
+    const result = await this.imageParseService.parseImage(body.userId, body.imageUrl)
 
     if (result.success) {
       return {

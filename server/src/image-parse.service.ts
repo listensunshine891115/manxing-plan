@@ -330,5 +330,5 @@ export class ImageParseService {
 }
 
 // 导入 Supabase 客户端
-import { getSupabaseClient } from './storage/database/shared/schema'
+import { getSupabaseClient } from './storage/database/supabase-client'
 import { SupabaseClient } from '@supabase/supabase-js'
