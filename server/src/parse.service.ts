@@ -342,16 +342,52 @@ export class ParseService {
       // 调用 LLM 提取多个灵感点
       const prompt = this.buildMultiExtractPrompt(content, sourceType, title, sourceUrl)
       
-      const response = await this.llmClient.invoke(
-        [{ role: 'user', content: prompt }],
-        {
-          model: 'doubao-seed-2-0-lite-260215',
-          temperature: 0.7
+      let response: any = null
+      try {
+        response = await this.llmClient.invoke(
+          [{ role: 'user', content: prompt }],
+          {
+            model: 'doubao-pro-4o-250528',
+            temperature: 0.7
+          }
+        )
+        console.log(`[Parse] LLM 响应:`, JSON.stringify(response).slice(0, 500))
+      } catch (llmError: any) {
+        console.error(`[Parse] LLM 调用失败:`, llmError.message)
+        return { success: false, message: `LLM 服务暂不可用: ${llmError.message}` }
+      }
+
+      // 解析 LLM 返回
+      let responseContent = ''
+      if (typeof response === 'string') {
+        responseContent = response
+      } else if (response?.content) {
+        if (typeof response.content === 'string') {
+          responseContent = response.content
+        } else if (Array.isArray(response.content)) {
+          for (const item of response.content) {
+            if (item?.type === 'text' && item?.text) {
+              responseContent = item.text
+              break
+            }
+          }
+        } else if (response.content?.text) {
+          responseContent = response.content.text
         }
-      )
+      } else if (response?.text) {
+        responseContent = response.text
+      } else {
+        try {
+          responseContent = JSON.stringify(response)
+        } catch {
+          responseContent = String(response)
+        }
+      }
+      
+      console.log(`[Parse] LLM 响应内容前200字: ${responseContent.slice(0, 200)}`)
 
       // 解析 LLM 返回的 JSON
-      const result = this.parseMultiLLMResponse(response.content)
+      const result = this.parseMultiLLMResponse(responseContent)
 
       console.log(`[Parse] 提取到 ${result.inspirationPoints.length} 个灵感点`)
 
@@ -1388,19 +1424,75 @@ export class ParseService {
     // 构建提示词
     const prompt = this.buildExtractPrompt(content, sourceType, title)
 
-    console.log(`[Parse] 调用 LLM 提取信息 - sourceType: ${sourceType}`)
+    console.log(`[Parse] 调用 LLM 提取信息 - sourceType: ${sourceType}, content长度: ${content.length}`)
 
-    // 调用 LLM
-    const response = await this.llmClient.invoke(
-      [{ role: 'user', content: prompt }],
-      {
-        model: 'doubao-seed-2-0-lite-260215',
-        temperature: 0.3
+    let response: any = null
+    
+    try {
+      // 调用 LLM
+      response = await this.llmClient.invoke(
+        [{ role: 'user', content: prompt }],
+        {
+          model: 'doubao-pro-4o-250528',
+          temperature: 0.3
+        }
+      )
+      
+      console.log(`[Parse] LLM 响应类型: ${typeof response}`)
+      console.log(`[Parse] LLM 响应 keys: ${response ? Object.keys(response) : 'null'}`)
+      console.log(`[Parse] LLM 响应:`, JSON.stringify(response).slice(0, 500))
+    } catch (llmError: any) {
+      console.error(`[Parse] LLM 调用失败:`, llmError.message)
+      return {
+        name: '未命名灵感',
+        location: '',
+        time: '',
+        primaryTag: '景点',
+        secondaryTag: '',
+        price: '待定',
+        description: content.slice(0, 200) || 'LLM 提取失败',
+        source: '',
+        url: '',
+        coverImage: '',
+        tags: []
       }
-    )
+    }
+
+    // 解析 LLM 返回
+    let responseContent = ''
+    
+    if (typeof response === 'string') {
+      responseContent = response
+    } else if (response?.content) {
+      if (typeof response.content === 'string') {
+        responseContent = response.content
+      } else if (Array.isArray(response.content)) {
+        // 处理数组格式的响应
+        for (const item of response.content) {
+          if (item?.type === 'text' && item?.text) {
+            responseContent = item.text
+            break
+          }
+        }
+      } else if (response.content?.text) {
+        responseContent = response.content.text
+      }
+    } else if (response?.text) {
+      responseContent = response.text
+    } else {
+      // 尝试序列化整个响应
+      try {
+        responseContent = JSON.stringify(response)
+      } catch {
+        responseContent = String(response)
+      }
+    }
+    
+    console.log(`[Parse] LLM 响应内容长度: ${responseContent.length}`)
+    console.log(`[Parse] LLM 响应内容前200字: ${responseContent.slice(0, 200)}`)
 
     // 解析 LLM 返回的 JSON
-    const result = this.parseLLMResponse(response.content)
+    const result = this.parseLLMResponse(responseContent)
 
     // 补充来源信息
     if (!result.source && sourceType) {

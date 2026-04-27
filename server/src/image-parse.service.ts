@@ -170,57 +170,88 @@ export class ImageParseService {
       let response: any = null
       try {
         if (this.llmClient) {
-          response = await this.llmClient.invoke([
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: prompt },
-                { type: 'image_url', image_url: { url: imageUrl } }
-              ]
-            }
-          ], {
+          // 构建消息内容
+          const messageContent = [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: imageUrl } }
+          ]
+          
+          response = await this.llmClient.invoke(messageContent, {
             model: 'doubao-vision'
           })
+          
+          console.log('[ImageParse] LLM 响应类型:', typeof response)
+          console.log('[ImageParse] LLM 响应 keys:', response ? Object.keys(response) : 'null')
+          console.log('[ImageParse] LLM 响应:', JSON.stringify(response).slice(0, 500))
+        } else {
+          console.error('[ImageParse] LLM 客户端未初始化')
+          return {
+            success: false,
+            message: 'LLM 服务未初始化',
+            data: {
+              inspirationPoints: []
+            }
+          }
         }
-      } catch (llmError) {
-        console.error('[ImageParse] LLM 调用失败:', llmError)
+      } catch (llmError: any) {
+        console.error('[ImageParse] LLM 调用失败:', llmError.message)
         return {
           success: false,
-          message: '图片识别服务暂不可用',
+          message: '图片识别服务暂不可用: ' + llmError.message,
           data: {
             inspirationPoints: []
           }
         }
       }
 
-      console.log('[ImageParse] LLM 响应:', JSON.stringify(response))
+      // 解析 LLM 返回
+      let responseContent = ''
+      if (typeof response === 'string') {
+        responseContent = response
+      } else if (response?.content) {
+        if (typeof response.content === 'string') {
+          responseContent = response.content
+        } else if (Array.isArray(response.content)) {
+          for (const item of response.content) {
+            if (item?.type === 'text' && item?.text) {
+              responseContent = item.text
+              break
+            }
+          }
+        } else if (response.content?.text) {
+          responseContent = response.content.text
+        }
+      } else if (response?.text) {
+        responseContent = response.text
+      } else {
+        try {
+          responseContent = JSON.stringify(response)
+        } catch {
+          responseContent = String(response)
+        }
+      }
+      
+      console.log('[ImageParse] 解析后内容:', responseContent.slice(0, 300))
 
       // 解析 LLM 返回的 JSON
       let inspirationPoints: any[] = []
       
-      if (response.content && Array.isArray(response.content)) {
-        for (const item of response.content) {
-          if (item.type === 'text') {
-            try {
-              // 尝试解析 JSON
-              const text = item.text.trim()
-              // 移除可能的 markdown 代码块标记
-              const jsonStr = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '')
-              inspirationPoints = JSON.parse(jsonStr)
-              
-              // 为每个灵感点生成唯一 ID
-              inspirationPoints = inspirationPoints.map((p, index) => ({
-                ...p,
-                id: `img_${Date.now()}_${index}`,
-                selected: true
-              }))
-              
-              break
-            } catch (parseError) {
-              console.error('[ImageParse] 解析 LLM 返回失败:', parseError)
-              console.log('[ImageParse] LLM 原始返回:', item.text)
-            }
-          }
+      if (responseContent) {
+        try {
+          // 尝试解析 JSON
+          // 移除可能的 markdown 代码块标记
+          const jsonStr = responseContent.replace(/^```json\s*/i, '').replace(/\s*```$/i, '')
+          inspirationPoints = JSON.parse(jsonStr)
+          
+          // 为每个灵感点生成唯一 ID
+          inspirationPoints = inspirationPoints.map((p, index) => ({
+            ...p,
+            id: `img_${Date.now()}_${index}`,
+            selected: true
+          }))
+        } catch (parseError) {
+          console.error('[ImageParse] 解析 LLM 返回失败:', parseError)
+          console.log('[ImageParse] LLM 原始返回:', responseContent)
         }
       }
 
