@@ -60,6 +60,9 @@ export default function Index() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string>('')
 
+  // 公众号二维码弹窗
+  const [showOfficialAccount, setShowOfficialAccount] = useState(false)
+
   // 检查登录状态
   const checkLogin = async () => {
     try {
@@ -475,23 +478,10 @@ export default function Index() {
           
           <View className="flex items-center gap-2">
             <View 
-              className="flex items-center gap-1 px-3 py-1 rounded-full text-xs"
-              style={{ 
-                backgroundColor: userInfo.wx_openid ? '#dcfce7' : '#fef3c7',
-                color: userInfo.wx_openid ? '#16a34a' : '#d97706'
-              }}
+              className="flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200"
+              onClick={() => setShowOfficialAccount(true)}
             >
-              {userInfo.wx_openid ? (
-                <>
-                  <Check size={12} color="#16a34a" />
-                  <Text>已绑定</Text>
-                </>
-              ) : (
-                <>
-                  <Link2 size={12} color="#d97706" />
-                  <Text onClick={() => Taro.navigateTo({ url: '/pages/bind-guide/index' })}>去绑定</Text>
-                </>
-              )}
+              <Text style={{ color: '#ea580c', fontSize: '12px' }}>公众号</Text>
             </View>
             <View onClick={() => Taro.navigateTo({ url: '/pages/settings/index' })}>
               <Settings size={20} color="#6b7280" />
@@ -1018,6 +1008,84 @@ export default function Index() {
                 </View>
               )}
             </View>
+          </View>
+        </View>
+      )}
+
+      {/* 微信公众号弹窗 */}
+      {showOfficialAccount && (
+        <View 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setShowOfficialAccount(false)}
+        >
+          <View 
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '320px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Text className="block text-lg font-bold text-gray-900 mb-2">
+              此刻与你漫行
+            </Text>
+            <Text className="block text-sm text-gray-500 mb-4">
+              长按识别二维码关注公众号
+            </Text>
+            
+            {/* 二维码图片 - 需要替换为实际上传后的URL */}
+            <View 
+              style={{
+                width: '200px',
+                height: '200px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '16px',
+                overflow: 'hidden'
+              }}
+            >
+              <TaroImage 
+                src="https://manxing-plan-1309460899.cos.ap-guangzhou.myqcloud.com/wechat/official-account-qrcode.jpg"
+                style={{ width: '200px', height: '200px' }}
+                mode="aspectFit"
+              />
+            </View>
+            
+            <Text className="block text-sm text-gray-600 mb-2">
+              微信号：wanderingsparkling
+            </Text>
+            
+            <Text className="block text-xs text-gray-400 mb-4">
+              公众号ID：gh_8d07103cbd76
+            </Text>
+            
+            <Button 
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowOfficialAccount(false)}
+            >
+              <Text className="text-gray-600">关闭</Text>
+            </Button>
           </View>
         </View>
       )}
