@@ -13,10 +13,12 @@ import { MapService } from '@/map.service'
 import { VoteController } from '@/vote.controller'
 import { VoteService } from '@/vote.service'
 import { LocationController } from '@/location.controller'
+import { NotificationController } from '@/notification.controller'
+import { NotificationService } from '@/notification.service'
 
 @Module({
   imports: [],
-  controllers: [AppController, TripController, MessageController, VoteController, LocationController],
+  controllers: [AppController, TripController, MessageController, VoteController, LocationController, NotificationController],
   providers: [
     AppService,
     TripService,
@@ -27,6 +29,7 @@ import { LocationController } from '@/location.controller'
     VideoParseService,
     MapService,
     VoteService,
+    NotificationService,
   ],
 })
 export class AppModule {}

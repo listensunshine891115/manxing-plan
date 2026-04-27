@@ -110,11 +110,52 @@ export const voteSessions = pgTable("vote_sessions", {
 	title: varchar({ length: 255 }).notNull(),
 	creatorName: varchar("creator_name", { length: 50 }),
 	inspirationPoints: jsonb().notNull(),
+	startDate: varchar("start_date", { length: 20 }),
+	endDate: varchar("end_date", { length: 20 }),
+	meetupPlace: text().array(),
+	voteDeadline: timestamp("vote_deadline", { withTimezone: true, mode: 'string' }),
+	creatorOpenid: varchar("creator_openid", { length: 64 }),
+	invitedCount: integer("invited_count").default(1),
+	notificationSent: boolean("notification_sent").default(false),
 	expiresAt: timestamp("expires_at", { withTimezone: true, mode: 'string' }),
 	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("vote_sessions_create_time_idx").using("btree", table.createTime.asc().nullsLast().op("timestamptz_ops")),
 	index("vote_sessions_share_code_idx").using("btree", table.shareCode.asc().nullsLast().op("text_ops")),
 	index("vote_sessions_trip_id_idx").using("btree", table.tripId.asc().nullsLast().op("text_ops")),
+	index("vote_sessions_deadline_idx").using("btree", table.voteDeadline.asc().nullsLast().op("timestamptz_ops")),
 	unique("vote_sessions_share_code_unique").on(table.shareCode),
+]);
+
+// 用户订阅状态表
+export const userSubscriptions = pgTable("user_subscriptions", {
+	id: serial().primaryKey().notNull(),
+	openid: varchar({ length: 64 }).notNull(),
+	sessionId: varchar("session_id", { length: 36 }).notNull(),
+	templateType: varchar("template_type", { length: 20 }).notNull(), // 'vote_result' | 'vote_reminder'
+	subscribed: boolean().default(true).notNull(),
+	subscribedAt: timestamp("subscribed_at", { withTimezone: true, mode: 'string' }),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("user_subs_openid_idx").using("btree", table.openid.asc().nullsLast().op("text_ops")),
+	index("user_subs_session_idx").using("btree", table.sessionId.asc().nullsLast().op("text_ops")),
+	index("user_subs_type_idx").using("btree", table.templateType.asc().nullsLast().op("text_ops")),
+	unique("user_subs_unique").on(table.openid, table.sessionId, table.templateType),
+]);
+
+// 通知队列表
+export const notificationQueue = pgTable("notification_queue", {
+	id: serial().primaryKey().notNull(),
+	openid: varchar({ length: 64 }).notNull(),
+	sessionId: varchar("session_id", { length: 36 }).notNull(),
+	templateId: varchar("template_id", { length: 50 }).notNull(),
+	page: varchar({ length: 255 }),
+	data: jsonb(),
+	status: varchar({ length: 20 }).default('pending').notNull(), // 'pending' | 'sent' | 'failed'
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	sentAt: timestamp("sent_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("notif_queue_status_idx").using("btree", table.status.asc().nullsLast().op("text_ops")),
+	index("notif_queue_session_idx").using("btree", table.sessionId.asc().nullsLast().op("text_ops")),
+	index("notif_queue_openid_idx").using("btree", table.openid.asc().nullsLast().op("text_ops")),
 ]);

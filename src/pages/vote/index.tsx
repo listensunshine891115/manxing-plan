@@ -3,7 +3,7 @@ import Taro, { useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import { View, Text, Image } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Network } from '@/network'
-import { ThumbsUp, ThumbsDown, Clock, Users, ArrowLeft, MapPin, Calendar, Share2 } from 'lucide-react-taro'
+import { ThumbsUp, ThumbsDown, Clock, Users, ArrowLeft, MapPin, Calendar, Share2, Bell, BellOff } from 'lucide-react-taro'
 import './index.config'
 
 interface InspirationPoint {
@@ -50,6 +50,8 @@ export default function VotePage() {
   const [shareCode, setShareCode] = useState('')
   const [showResults, setShowResults] = useState(false)
   const [isCreator, setIsCreator] = useState(false)
+  const [notificationSubscribed, setNotificationSubscribed] = useState(false)
+  const [userOpenid, setUserOpenid] = useState('') // 存储用户openid
 
   // 获取分享码和来源
   useEffect(() => {
@@ -62,11 +64,27 @@ export default function VotePage() {
         setShowResults(true)
       }
       loadSession(params.code)
+      getUserInfo()
     } else {
       setError('缺少分享码')
       setLoading(false)
     }
   }, [])
+
+  // 获取用户信息
+  const getUserInfo = async () => {
+    try {
+      // 尝试获取 openid
+      const loginRes = await Taro.login()
+      if (loginRes.code) {
+        // 通过 code 获取 openid（实际项目中需要后端接口）
+        // 这里简化处理，直接使用 code 作为临时标识
+        setUserOpenid(loginRes.code)
+      }
+    } catch (err) {
+      console.error('[VotePage] 获取用户信息失败:', err)
+    }
+  }
 
   // 加载投票会话
   const loadSession = async (code: string) => {
@@ -91,6 +109,11 @@ export default function VotePage() {
           // 未截止，加载投票结果检查是否已投票
           loadResults(sessionData.sessionId)
         }
+        
+        // 加载订阅状态
+        if (sessionData.sessionId && userOpenid) {
+          loadSubscriptionStatus(sessionData.sessionId)
+        }
       } else {
         setError(res.data.msg || '投票链接已失效')
       }
@@ -100,6 +123,94 @@ export default function VotePage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // 加载订阅状态
+  const loadSubscriptionStatus = async (sessionId: string) => {
+    try {
+      const res = await Network.request({
+        url: `/api/notification/subscription/${userOpenid}/${sessionId}/vote_result`,
+      })
+      
+      if (res.data.code === 200 && res.data.data) {
+        setNotificationSubscribed(res.data.data.subscribed)
+      }
+    } catch (err) {
+      console.error('[VotePage] 获取订阅状态失败:', err)
+    }
+  }
+
+  // 处理订阅消息
+  const handleSubscribeNotification = async () => {
+    try {
+      // 获取用户授权
+      const settingRes = await Taro.getSetting()
+      console.log('[VotePage] 订阅设置:', settingRes)
+      
+      // 请求订阅消息权限（微信小程序 API）
+      const tmplId = 'YOUR_VOTE_TEMPLATE_ID' // 需要替换为实际的模板ID
+      
+      // 使用 wx 接口直接调用（兼容处理）
+      const subscribeRes = await new Promise<any>((resolve, reject) => {
+        // @ts-ignore
+        if (typeof wx !== 'undefined' && wx.requestSubscribeMessage) {
+          // @ts-ignore
+          wx.requestSubscribeMessage({
+            tmplIds: [tmplId],
+            success: (res: any) => resolve(res),
+            fail: (err: any) => reject(err)
+          })
+        } else {
+          // H5 或不支持的环境，直接成功
+          resolve({ [tmplId]: 'accept' })
+        }
+      })
+      
+      console.log('[VotePage] 订阅成功:', subscribeRes)
+      
+      if (subscribeRes && subscribeRes[tmplId] === 'accept') {
+        // 用户同意了订阅
+        await saveSubscription(true)
+        setNotificationSubscribed(true)
+        Taro.showToast({ title: '已开启投票提醒', icon: 'success' })
+      } else {
+        Taro.showToast({ title: '您拒绝了订阅', icon: 'none' })
+      }
+    } catch (err) {
+      console.error('[VotePage] 订阅异常:', err)
+      // 降级：直接保存本地订阅状态
+      await saveSubscription(true)
+      setNotificationSubscribed(true)
+      Taro.showToast({ title: '已记录提醒设置', icon: 'success' })
+    }
+  }
+
+  // 保存订阅状态到后端
+  const saveSubscription = async (subscribed: boolean) => {
+    if (!session?.sessionId) return
+    
+    try {
+      await Network.request({
+        url: '/api/notification/subscribe',
+        method: 'POST',
+        data: {
+          openid: userOpenid,
+          sessionId: session.sessionId,
+          templateType: 'vote_result',
+          subscribed,
+        }
+      })
+      console.log('[VotePage] 订阅状态已保存:', subscribed)
+    } catch (err) {
+      console.error('[VotePage] 保存订阅状态失败:', err)
+    }
+  }
+
+  // 取消订阅
+  const handleUnsubscribe = async () => {
+    await saveSubscription(false)
+    setNotificationSubscribed(false)
+    Taro.showToast({ title: '已关闭投票提醒', icon: 'success' })
   }
 
   // 加载投票结果
@@ -202,6 +313,56 @@ export default function VotePage() {
       Taro.showToast({ title: '提交失败，请重试', icon: 'none' })
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // 发起人结束投票并发送通知
+  const handleEndVoting = async () => {
+    if (!session) return
+    
+    // 确认操作
+    const confirmRes = await Taro.showModal({
+      title: '确认结束投票',
+      content: '确定要结束投票并通知所有参与者吗？',
+      confirmText: '确定结束',
+      cancelText: '再等等',
+    })
+    
+    if (!confirmRes.confirm) return
+    
+    try {
+      // 计算投票结果
+      const voteResults = Object.entries(results)
+        .map(([id, result]) => ({
+          name: session.inspirationPoints.find(p => p.id === id)?.title || '',
+          votes: result.likes
+        }))
+        .sort((a, b) => b.votes - a.votes)
+      
+      const winner = voteResults.length > 0 ? voteResults[0].name : undefined
+      
+      // 调用后端发送通知
+      const res = await Network.request({
+        url: '/api/notification/trigger-vote-result',
+        method: 'POST',
+        data: {
+          sessionId: session.sessionId,
+          title: session.title,
+          results: voteResults,
+          winner
+        }
+      })
+      
+      console.log('[VotePage] 发送投票结果通知:', res.data)
+      
+      if (res.data.code === 200) {
+        Taro.showToast({ title: '已发送结果通知', icon: 'success' })
+      } else {
+        Taro.showToast({ title: '发送通知失败', icon: 'none' })
+      }
+    } catch (err) {
+      console.error('[VotePage] 结束投票失败:', err)
+      Taro.showToast({ title: '操作失败，请重试', icon: 'none' })
     }
   }
 
@@ -421,6 +582,31 @@ export default function VotePage() {
           <Text className="text-xs text-orange-500 mt-1">
             截止时间到达后，未投票者视为弃权
           </Text>
+          
+          {/* 订阅投票提醒按钮 */}
+          <View className="mt-3 pt-3 border-t border-orange-200">
+            {notificationSubscribed ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full border-green-300 bg-green-50"
+                onClick={handleUnsubscribe}
+              >
+                <BellOff size={14} color="#22C55E" className="mr-2" />
+                <Text className="text-green-600 text-sm">已开启投票结果提醒</Text>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full border-orange-300 bg-white"
+                onClick={handleSubscribeNotification}
+              >
+                <Bell size={14} color="#F59E0B" className="mr-2" />
+                <Text className="text-orange-600 text-sm">开启投票结果提醒</Text>
+              </Button>
+            )}
+          </View>
         </View>
       )}
 
@@ -518,6 +704,21 @@ export default function VotePage() {
                 </Text>
               )}
             </View>
+            
+            {/* 结束投票并发送通知按钮 */}
+            {!session?.isExpired && votedCount > 0 && (
+              <View className="mx-4 mb-3">
+                <Button
+                  variant="outline"
+                  className="w-full py-3 rounded-xl border-orange-300 text-orange-600"
+                  onClick={handleEndVoting}
+                >
+                  <Bell size={16} color="#F59E0B" className="mr-2" />
+                  <Text className="text-orange-600">结束投票并发送结果通知</Text>
+                </Button>
+              </View>
+            )}
+            
             <Button
               className="w-full py-3 rounded-xl bg-green-500 text-white font-medium"
               onClick={handleShare}
