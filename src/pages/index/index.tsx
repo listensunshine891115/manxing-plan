@@ -62,6 +62,7 @@ export default function Index() {
 
   // 公众号二维码弹窗
   const [showOfficialAccount, setShowOfficialAccount] = useState(false)
+  const [qrCodeLoaded, setQrCodeLoaded] = useState(false)
 
   // 检查登录状态
   const checkLogin = async () => {
@@ -1050,7 +1051,7 @@ export default function Index() {
               长按识别二维码关注公众号
             </Text>
             
-            {/* 二维码图片 - 需要替换为实际上传后的URL */}
+            {/* 二维码图片 */}
             <View 
               style={{
                 width: '200px',
@@ -1064,10 +1065,18 @@ export default function Index() {
                 overflow: 'hidden'
               }}
             >
+              {!qrCodeLoaded && (
+                <View className="flex flex-col items-center">
+                  <Text className="block text-3xl mb-2">📱</Text>
+                  <Text className="block text-xs text-gray-400">公众号二维码</Text>
+                </View>
+              )}
               <TaroImage 
                 src="https://manxing-plan-1309460899.cos.ap-guangzhou.myqcloud.com/wechat/official-account-qrcode.jpg"
-                style={{ width: '200px', height: '200px' }}
+                style={{ width: '200px', height: '200px', display: qrCodeLoaded ? 'block' : 'none' }}
                 mode="aspectFit"
+                onLoad={() => setQrCodeLoaded(true)}
+                onError={() => setQrCodeLoaded(false)}
               />
             </View>
             
