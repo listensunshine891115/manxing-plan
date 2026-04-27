@@ -170,15 +170,19 @@ export class ImageParseService {
       let response: any = null
       try {
         if (this.llmClient) {
-          // 构建消息内容
+          // 构建消息内容（正确的格式）
           const messageContent = [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: imageUrl } }
+            { 
+              role: 'user', 
+              content: [
+                { type: 'text', text: prompt },
+                { type: 'image_url', image_url: { url: imageUrl } }
+              ]
+            }
           ]
           
-          response = await this.llmClient.invoke(messageContent, {
-            // 使用默认模型（已支持图片识别）
-          })
+          console.log('[ImageParse] 调用 LLM，图片URL:', imageUrl)
+          response = await this.llmClient.invoke(messageContent)
           
           console.log('[ImageParse] LLM 响应类型:', typeof response)
           console.log('[ImageParse] LLM 响应 keys:', response ? Object.keys(response) : 'null')
