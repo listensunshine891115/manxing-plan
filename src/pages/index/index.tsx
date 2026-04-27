@@ -615,11 +615,30 @@ export default function Index() {
       {/* 预览灵感点弹窗 */}
       {showPreviewDialog && (
         <View 
-          className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
           onClick={() => setShowPreviewDialog(false)}
         >
           <View 
-            className="bg-white rounded-2xl w-full max-h-[80vh] flex flex-col"
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '16px',
+              width: '100%',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* 标题栏 */}
@@ -739,11 +758,29 @@ export default function Index() {
       {/* 分类弹窗 */}
       {showCategoryDialog && (
         <View 
-          className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-end"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'flex-end'
+          }}
           onClick={() => setShowCategoryDialog(false)}
         >
           <View 
-            className="bg-white rounded-t-2xl w-full max-h-[80vh] flex flex-col"
+            style={{
+              backgroundColor: '#fff',
+              borderTopLeftRadius: '16px',
+              borderTopRightRadius: '16px',
+              width: '100%',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* 标题栏 */}

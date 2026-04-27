@@ -275,8 +275,29 @@ const CategoryPage = () => {
 
       {/* 添加弹窗 */}
       {showAddDialog && (
-        <View className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-end">
-          <View className="bg-white rounded-t-2xl w-full p-4 pb-8">
+        <View 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'flex-end'
+          }}
+        >
+          <View 
+            style={{
+              backgroundColor: '#fff',
+              borderTopLeftRadius: '16px',
+              borderTopRightRadius: '16px',
+              width: '100%',
+              padding: '16px',
+              paddingBottom: '32px'
+            }}
+          >
             <View className="flex justify-between items-center mb-4">
               <Text className="block text-lg font-semibold">收录{primaryTag}灵感</Text>
               <View 
