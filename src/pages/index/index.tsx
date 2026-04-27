@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import Taro from '@tarojs/taro'
-import { View, Text, ScrollView } from '@tarojs/components'
+import { View, Text, ScrollView, Image as TaroImage } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { 
   Sparkles, MapPin, Calendar, Check, User, Settings, Link2,
-  X, ChevronRight, Trash2, Plus, Heart, Clock, Footprints
+  X, ChevronRight, Trash2, Plus, Heart, Clock, Footprints,
+  Camera
 } from 'lucide-react-taro'
 import { Network } from '@/network'
 import { primaryTagConfig, secondaryTagConfig } from './config'
@@ -54,6 +55,10 @@ export default function Index() {
   // 分类弹窗
   const [showCategoryDialog, setShowCategoryDialog] = useState(false)
   const [currentCategory, setCurrentCategory] = useState<string>('')
+
+  // 图片上传状态
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string>('')
 
   // 检查登录状态
   const checkLogin = async () => {
@@ -275,6 +280,97 @@ export default function Index() {
     }
   }
 
+  // 图片上传并提取灵感点
+  const handleImageUpload = async () => {
+    try {
+      // 选择图片
+      const chooseRes = await Taro.chooseImage({
+        count: 1,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera']
+      })
+
+      if (!chooseRes.tempFilePaths || chooseRes.tempFilePaths.length === 0) {
+        return
+      }
+
+      const tempFilePath = chooseRes.tempFilePaths[0]
+      setUploadingImage(true)
+      setUploadedImageUrl(tempFilePath)
+      
+      Taro.showLoading({ title: '正在识别图片...' })
+
+      // 上传图片并提取灵感点
+      const user = await checkLogin()
+      const userId = user?.id || 'guest_' + Date.now()
+
+      // 先上传图片获取URL
+      const uploadRes = await Network.uploadFile({
+        url: '/api/trip/upload-image',
+        filePath: tempFilePath,
+        name: 'image'
+      })
+
+      console.log('[ImageUpload] 上传响应:', uploadRes)
+
+      // 解析响应获取图片URL
+      let imageUrl = tempFilePath
+      if (uploadRes.data) {
+        const resData = typeof uploadRes.data === 'string' ? JSON.parse(uploadRes.data) : uploadRes.data
+        if (resData.code === 200 && resData.data?.url) {
+          imageUrl = resData.data.url
+        }
+      }
+
+      // 调用图片识别接口提取灵感点
+      const parseRes = await Network.request({
+        url: '/api/trip/parse-image',
+        method: 'POST',
+        data: {
+          userId,
+          imageUrl
+        },
+        timeout: 120000
+      })
+
+      Taro.hideLoading()
+      setUploadingImage(false)
+
+      console.log('[ImageUpload] 识别响应:', parseRes.data)
+
+      if (parseRes.data?.success && parseRes.data?.data?.inspirationPoints?.length > 0) {
+        const pointsWithSelected = parseRes.data.data.inspirationPoints.map((p: any) => ({
+          ...p,
+          selected: p.selected !== false
+        }))
+        setPreviewPoints(pointsWithSelected)
+        setShowPreviewDialog(true)
+        setUploadedImageUrl('')
+      } else {
+        Taro.showToast({ 
+          title: parseRes.data?.message || '未能从图片中提取到灵感点', 
+          icon: 'none',
+          duration: 3000
+        })
+        setUploadedImageUrl('')
+      }
+    } catch (error: any) {
+      Taro.hideLoading()
+      setUploadingImage(false)
+      console.error('[ImageUpload] 处理失败:', error)
+      Taro.showToast({ 
+        title: '图片处理失败: ' + (error.message || ''), 
+        icon: 'none',
+        duration: 3000
+      })
+    }
+  }
+
+  // 删除已上传的图片
+  const handleRemoveImage = () => {
+    setUploadedImageUrl('')
+  }
+
   // 删除灵感点
   const handleDelete = async (id: string) => {
     Taro.showModal({
@@ -449,6 +545,71 @@ export default function Index() {
           >
             一键粘贴剪贴板内容
           </Text>
+          
+          {/* 图片上传区域 */}
+          <View className="mt-3 pt-3 border-t border-green-200">
+            <Text className="block text-xs text-green-600 mb-2 text-center">
+              或上传图片识别灵感点
+            </Text>
+            <View className="flex items-center justify-center gap-3">
+              {uploadedImageUrl ? (
+                // 已上传图片预览
+                <View style={{ position: 'relative' }}>
+                  <TaroImage 
+                    src={uploadedImageUrl}
+                    style={{ width: '80px', height: '80px', borderRadius: '8px' }}
+                    mode="aspectFill"
+                  />
+                  {uploadingImage && (
+                    <View 
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0,0,0,0.5)',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <Text className="text-white text-xs">识别中...</Text>
+                    </View>
+                  )}
+                  {!uploadingImage && (
+                    <View 
+                      style={{
+                        position: 'absolute',
+                        top: '-8px',
+                        right: '-8px',
+                        width: '20px',
+                        height: '20px',
+                        backgroundColor: '#ef4444',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      onClick={handleRemoveImage}
+                    >
+                      <X size={12} color="#ffffff" />
+                    </View>
+                  )}
+                </View>
+              ) : (
+                // 上传按钮
+                <View 
+                  className="w-20 h-20 rounded-lg border-2 border-dashed border-green-300 flex flex-col items-center justify-center bg-green-50"
+                  onClick={handleImageUpload}
+                >
+                  <Camera size={24} color="#10b981" />
+                  <Text className="block text-xs text-green-600 mt-1">上传图片</Text>
+                </View>
+              )}
+            </View>
+          </View>
         </View>
 
         {/* 我的灵感点 */}

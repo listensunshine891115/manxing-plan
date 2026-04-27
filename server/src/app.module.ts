@@ -15,10 +15,12 @@ import { VoteService } from '@/vote.service'
 import { LocationController } from '@/location.controller'
 import { NotificationController } from '@/notification.controller'
 import { NotificationService } from '@/notification.service'
+import { ImageParseController } from '@/image-parse.controller'
+import { ImageParseService } from '@/image-parse.service'
 
 @Module({
   imports: [],
-  controllers: [AppController, TripController, MessageController, VoteController, LocationController, NotificationController],
+  controllers: [AppController, TripController, MessageController, VoteController, LocationController, NotificationController, ImageParseController],
   providers: [
     AppService,
     TripService,
@@ -30,6 +32,7 @@ import { NotificationService } from '@/notification.service'
     MapService,
     VoteService,
     NotificationService,
+    ImageParseService,
   ],
 })
 export class AppModule {}
