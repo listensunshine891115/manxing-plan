@@ -148,7 +148,7 @@ export default function VotePage() {
       console.log('[VotePage] 订阅设置:', settingRes)
       
       // 请求订阅消息权限（微信小程序 API）
-      const tmplId = 'YOUR_VOTE_TEMPLATE_ID' // 需要替换为实际的模板ID
+      const tmplId = '_5lEYGoNMepIGY_EkUvgdxb-jipPdD4I9YTiSFKrqaM' // 微信订阅消息模板ID
       
       // 使用 wx 接口直接调用（兼容处理）
       const subscribeRes = await new Promise<any>((resolve, reject) => {

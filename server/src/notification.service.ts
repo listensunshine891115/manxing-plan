@@ -3,8 +3,8 @@ import { getSupabaseClient } from '@/storage/database/supabase-client'
 import { createClient } from '@supabase/supabase-js'
 
 // 微信订阅消息模板ID（需要在小程序后台配置）
-const VOTE_RESULT_TEMPLATE_ID = 'YOUR_VOTE_TEMPLATE_ID' // 投票结果通知模板
-const VOTE_REMINDER_TEMPLATE_ID = 'YOUR_REMINDER_TEMPLATE_ID' // 投票提醒模板
+const VOTE_RESULT_TEMPLATE_ID = '_5lEYGoNMepIGY_EkUvgdxb-jipPdD4I9YTiSFKrqaM' // 投票结果通知模板
+const VOTE_REMINDER_TEMPLATE_ID = '_5lEYGoNMepIGY_EkUvgdxb-jipPdD4I9YTiSFKrqaM' // 投票提醒模板
 
 export interface SubscribeParams {
   openid: string
