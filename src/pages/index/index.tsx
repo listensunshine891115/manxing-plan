@@ -300,7 +300,6 @@ export default function Index() {
 
       const tempFilePath = chooseRes.tempFilePaths[0]
       setUploadingImage(true)
-      setUploadedImageUrl(tempFilePath)
       
       Taro.showLoading({ title: '正在识别图片...' })
 
@@ -308,7 +307,7 @@ export default function Index() {
       const user = await checkLogin()
       const userId = user?.id || 'guest_' + Date.now()
 
-      // 先上传图片获取URL
+      // 先上传图片获取本地路径
       const uploadRes = await Network.uploadFile({
         url: '/api/trip/upload-image',
         filePath: tempFilePath,
@@ -317,12 +316,17 @@ export default function Index() {
 
       console.log('[ImageUpload] 上传响应:', uploadRes)
 
-      // 解析响应获取图片URL
-      let imageUrl = tempFilePath
+      // 解析响应获取图片路径
+      let imagePath = ''
       if (uploadRes.data) {
         const resData = typeof uploadRes.data === 'string' ? JSON.parse(uploadRes.data) : uploadRes.data
-        if (resData.code === 200 && resData.data?.url) {
-          imageUrl = resData.data.url
+        // 优先使用本地路径（解决服务器无法访问外部URL的问题）
+        if (resData.data?.localPath) {
+          imagePath = resData.data.localPath
+          console.log('[ImageUpload] 使用本地路径:', imagePath)
+        } else if (resData.data?.url) {
+          imagePath = resData.data.url
+          console.log('[ImageUpload] 使用URL:', imagePath)
         }
       }
 
@@ -332,7 +336,7 @@ export default function Index() {
         method: 'POST',
         data: {
           userId,
-          imageUrl
+          imageUrl: imagePath  // 使用本地路径
         },
         timeout: 120000
       })

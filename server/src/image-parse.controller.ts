@@ -47,7 +47,8 @@ export class ImageParseController {
         msg: '上传成功',
         success: true,
         data: {
-          url: result.url
+          url: result.url,
+          localPath: result.localPath  // 返回本地路径供后续处理
         }
       }
     } else {
