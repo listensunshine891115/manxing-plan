@@ -339,7 +339,7 @@ export class ParseService {
 
       console.log(`[Parse] 开始分析内容，长度: ${content.length}`)
 
-      // 调用 LLM 提取多个灵感点
+      // 调用 LLM 提取多个灵感点（使用默认模型）
       const prompt = this.buildMultiExtractPrompt(content, sourceType, title, sourceUrl)
       
       let response: any = null
@@ -347,7 +347,6 @@ export class ParseService {
         response = await this.llmClient.invoke(
           [{ role: 'user', content: prompt }],
           {
-            model: 'doubao-pro-4o-250528',
             temperature: 0.7
           }
         )
@@ -1429,11 +1428,10 @@ export class ParseService {
     let response: any = null
     
     try {
-      // 调用 LLM
+      // 调用 LLM（使用默认模型）
       response = await this.llmClient.invoke(
         [{ role: 'user', content: prompt }],
         {
-          model: 'doubao-pro-4o-250528',
           temperature: 0.3
         }
       )

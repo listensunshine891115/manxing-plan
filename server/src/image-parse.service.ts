@@ -177,7 +177,7 @@ export class ImageParseService {
           ]
           
           response = await this.llmClient.invoke(messageContent, {
-            model: 'doubao-vision'
+            // 使用默认模型（已支持图片识别）
           })
           
           console.log('[ImageParse] LLM 响应类型:', typeof response)
