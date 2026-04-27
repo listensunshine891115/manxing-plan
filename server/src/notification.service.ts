@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { getSupabaseClient } from '@/storage/database/supabase-client'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 // 微信订阅消息模板ID（需要在小程序后台配置）
 const VOTE_RESULT_TEMPLATE_ID = '_5lEYGoNMepIGY_EkUvgdxb-jipPdD4I9YTiSFKrqaM' // 投票结果通知模板
@@ -22,7 +22,7 @@ export interface NotificationData {
 
 @Injectable()
 export class NotificationService implements OnModuleInit {
-  private supabase: ReturnType<typeof createClient>
+  private supabase: SupabaseClient<any, any, any>
   
   onModuleInit() {
     const url = process.env.SUPABASE_URL || process.env.COZE_SUPABASE_URL
@@ -34,7 +34,7 @@ export class NotificationService implements OnModuleInit {
 
   private getClient() {
     if (!this.supabase) {
-      this.supabase = getSupabaseClient()
+      this.supabase = getSupabaseClient() as SupabaseClient<any, any, any>
     }
     return this.supabase
   }

@@ -24,7 +24,7 @@ export class ImageParseController {
       }
     }
   }))
-  async uploadImage(@UploadedFile() file: Express.Multer.File) {
+  async uploadImage(@UploadedFile() file: any) {
     console.log('[POST] /api/trip/upload-image', {
       originalname: file?.originalname,
       mimetype: file?.mimetype,

@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common'
 import { getSupabaseClient } from '@/storage/database/supabase-client'
-import { createClient } from '@supabase/supabase-js'
-import { getLLMClient } from 'coze-coding-dev-sdk'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import * as fs from 'fs'
 import * as path from 'path'
 
 @Injectable()
 export class ImageParseService {
-  private supabase: ReturnType<typeof createClient>
+  private supabase: SupabaseClient<any, any, any>
+  private llmClient: any
 
   onModuleInit() {
     const url = process.env.SUPABASE_URL || process.env.COZE_SUPABASE_URL
@@ -15,11 +15,18 @@ export class ImageParseService {
     if (url && key) {
       this.supabase = createClient(url, key)
     }
+    // 初始化 LLM 客户端
+    try {
+      const { LLMClient } = require('coze-coding-dev-sdk')
+      this.llmClient = new LLMClient()
+    } catch (e) {
+      console.error('[ImageParse] LLM 客户端初始化失败:', e)
+    }
   }
 
   private getClient() {
     if (!this.supabase) {
-      this.supabase = getSupabaseClient()
+      this.supabase = getSupabaseClient() as SupabaseClient<any, any, any>
     }
     return this.supabase
   }
@@ -27,7 +34,7 @@ export class ImageParseService {
   /**
    * 上传图片到 Supabase Storage
    */
-  async uploadImage(file: Express.Multer.File): Promise<{ success: boolean; url?: string; message?: string }> {
+  async uploadImage(file: any): Promise<{ success: boolean; url?: string; message?: string }> {
     try {
       const client = this.getClient()
       
@@ -130,9 +137,6 @@ export class ImageParseService {
     try {
       console.log('[ImageParse] 开始识别图片:', imageUrl)
       
-      // 获取 LLM 客户端
-      const llmClient = getLLMClient()
-      
       // 构造提示词，要求从图片中提取旅行灵感点
       const prompt = `请仔细分析这张图片，识别其中的旅行灵感点信息。
 
@@ -163,19 +167,31 @@ export class ImageParseService {
 只返回JSON数组，不要有其他文字。`
 
       // 使用视觉模型分析图片
-      const response = await llmClient.chat({
-        model: 'doubao-vision',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: imageUrl } }
-            ]
+      let response: any = null
+      try {
+        if (this.llmClient) {
+          response = await this.llmClient.invoke([
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                { type: 'image_url', image_url: { url: imageUrl } }
+              ]
+            }
+          ], {
+            model: 'doubao-vision'
+          })
+        }
+      } catch (llmError) {
+        console.error('[ImageParse] LLM 调用失败:', llmError)
+        return {
+          success: false,
+          message: '图片识别服务暂不可用',
+          data: {
+            inspirationPoints: []
           }
-        ],
-        temperature: 0.7
-      })
+        }
+      }
 
       console.log('[ImageParse] LLM 响应:', JSON.stringify(response))
 
