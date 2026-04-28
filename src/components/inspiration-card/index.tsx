@@ -215,8 +215,21 @@ export const InspirationCard: React.FC<InspirationCardProps> = ({
                 className="mt-2 px-2 py-1 bg-blue-50 rounded-lg inline-flex items-center"
                 onClick={(e) => {
                   e?.stopPropagation?.()
-                  Taro.setClipboardData({ data: item.original_url })
-                  Taro.showToast({ title: '链接已复制', icon: 'success' })
+                  // 在支持的环境下直接打开链接
+                  const isWeapp = Taro.getEnv() === Taro.ENV_TYPE.WEAPP
+                  if (isWeapp) {
+                    // 微信小程序环境
+                    Taro.navigateTo({
+                      url: `/pages/webview/index?url=${encodeURIComponent(item.original_url || '')}`
+                    }).catch(() => {
+                      // 如果 webview 页面不存在，降级为复制
+                      Taro.setClipboardData({ data: item.original_url || '' })
+                      Taro.showToast({ title: '链接已复制，请在浏览器打开', icon: 'none' })
+                    })
+                  } else {
+                    // H5 环境直接打开
+                    window.location.href = item.original_url || ''
+                  }
                 }}
               >
                 <Text className="text-xs text-blue-600">来源链接</Text>

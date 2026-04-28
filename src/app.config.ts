@@ -11,7 +11,8 @@ export default defineAppConfig({
     'pages/route/index',
     'pages/vote/index',
     'pages/vote-result/index',
-    'pages/preview/index'
+    'pages/preview/index',
+    'pages/webview/index'
   ],
   window: {
     backgroundTextStyle: 'light',

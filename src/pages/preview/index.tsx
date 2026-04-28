@@ -274,8 +274,17 @@ export default function Preview() {
                           <View 
                             className="mt-2 ml-5 px-2 py-1 bg-blue-50 rounded-lg inline-flex items-center"
                             onClick={() => {
-                              Taro.setClipboardData({ data: item.original_url! })
-                              Taro.showToast({ title: '链接已复制', icon: 'success' })
+                              const isWeapp = Taro.getEnv() === Taro.ENV_TYPE.WEAPP
+                              if (isWeapp) {
+                                Taro.navigateTo({
+                                  url: `/pages/webview/index?url=${encodeURIComponent(item.original_url || '')}`
+                                }).catch(() => {
+                                  Taro.setClipboardData({ data: item.original_url || '' })
+                                  Taro.showToast({ title: '链接已复制', icon: 'none' })
+                                })
+                              } else {
+                                window.location.href = item.original_url || ''
+                              }
                             }}
                           >
                             <Text className="text-xs text-blue-600">来源链接</Text>

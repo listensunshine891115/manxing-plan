@@ -684,8 +684,17 @@ export default function VotePage() {
                   <View 
                     className="mt-2 px-2 py-1 bg-blue-50 rounded-lg inline-flex items-center"
                     onClick={() => {
-                      Taro.setClipboardData({ data: point.original_url || '' })
-                      Taro.showToast({ title: '链接已复制', icon: 'success' })
+                      const isWeapp = Taro.getEnv() === Taro.ENV_TYPE.WEAPP
+                      if (isWeapp) {
+                        Taro.navigateTo({
+                          url: `/pages/webview/index?url=${encodeURIComponent(point.original_url || '')}`
+                        }).catch(() => {
+                          Taro.setClipboardData({ data: point.original_url || '' })
+                          Taro.showToast({ title: '链接已复制', icon: 'none' })
+                        })
+                      } else {
+                        window.location.href = point.original_url || ''
+                      }
                     }}
                   >
                     <Text className="text-xs text-blue-600">来源链接</Text>
