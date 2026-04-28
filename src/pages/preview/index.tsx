@@ -29,6 +29,7 @@ interface TripItem {
   duration: number
   distance?: number
   inspirationId?: string
+  original_url?: string  // 原始链接
 }
 
 interface TripDay {
@@ -267,6 +268,19 @@ export default function Preview() {
                           <Text className="block text-xs text-gray-400 ml-5 mt-1">
                             距下站 {item.distance > 1000 ? `${(item.distance / 1000).toFixed(1)}km` : `${item.distance}m`}
                           </Text>
+                        )}
+                        {/* 原始链接标签 */}
+                        {item.original_url && (
+                          <View 
+                            className="mt-2 ml-5 px-2 py-1 bg-blue-50 rounded-lg inline-flex items-center"
+                            onClick={() => {
+                              Taro.setClipboardData({ data: item.original_url! })
+                              Taro.showToast({ title: '链接已复制', icon: 'success' })
+                            }}
+                          >
+                            <Text className="text-xs text-blue-600">来源链接</Text>
+                            <Text className="text-xs text-gray-400 ml-1">↗</Text>
+                          </View>
                         )}
                       </View>
                     </View>
