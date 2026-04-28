@@ -208,6 +208,21 @@ export const InspirationCard: React.FC<InspirationCardProps> = ({
                 <ChevronRight size={12} color="#3b82f6" />
               </View>
             )}
+            
+            {/* 来源链接标签 */}
+            {item.original_url && (
+              <View 
+                className="mt-2 px-2 py-1 bg-blue-50 rounded-lg inline-flex items-center"
+                onClick={(e) => {
+                  e?.stopPropagation?.()
+                  Taro.setClipboardData({ data: item.original_url })
+                  Taro.showToast({ title: '链接已复制', icon: 'success' })
+                }}
+              >
+                <Text className="text-xs text-blue-600">来源链接</Text>
+                <Text className="text-xs text-gray-400 ml-1">↗</Text>
+              </View>
+            )}
           </View>
         </View>
       </CardContent>

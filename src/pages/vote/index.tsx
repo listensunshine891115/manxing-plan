@@ -15,6 +15,7 @@ interface InspirationPoint {
   primaryTag?: string
   price?: string
   rating?: number
+  original_url?: string  // 原始链接
 }
 
 interface Session {
@@ -677,6 +678,20 @@ export default function VotePage() {
 
                 {/* 进度条 */}
                 {renderProgress(point.id)}
+                
+                {/* 来源链接标签 */}
+                {point.original_url && (
+                  <View 
+                    className="mt-2 px-2 py-1 bg-blue-50 rounded-lg inline-flex items-center"
+                    onClick={() => {
+                      Taro.setClipboardData({ data: point.original_url || '' })
+                      Taro.showToast({ title: '链接已复制', icon: 'success' })
+                    }}
+                  >
+                    <Text className="text-xs text-blue-600">来源链接</Text>
+                    <Text className="text-xs text-gray-400 ml-1">↗</Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
