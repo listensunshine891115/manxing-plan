@@ -271,10 +271,10 @@ export class ParseService {
                   title = ''
                   sourceType = 'text'
                 } else {
-                  return { success: false, message: '无法获取视频内容' }
+                  return { success: false, message: '无法获取视频内容，建议复制链接中的文字描述粘贴到输入框中' }
                 }
               } else {
-                return { success: false, message: '无法获取视频内容' }
+                return { success: false, message: '无法获取视频内容，建议复制链接中的文字描述粘贴到输入框中' }
               }
             }
           }
