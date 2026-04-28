@@ -320,7 +320,8 @@ export class TripService {
           start_time: this.calculateTime(9 + index * 3),
           duration: item.type === 'show' ? 180 : 120,
           type: item.type,
-          note: item.note
+          note: item.note,
+          original_url: item.original_url  // 保留原始链接
         }))
       })
     }
@@ -598,6 +599,7 @@ export class TripService {
       location: { name: string; lat: number; lng: number }
       locationSource?: 'original' | 'mock'
       note?: string
+      original_url?: string  // 原始链接
     }>,
     days: number,
     startDate: string
@@ -614,6 +616,7 @@ export class TripService {
       startTime: string
       duration: number
       note?: string
+      original_url?: string  // 原始链接
     }>
   }> {
     if (route.length === 0) return []
@@ -643,7 +646,8 @@ export class TripService {
           type: item.type || 'spot',
           startTime: this.calculateTime(9 + index * 2), // 每项间隔2小时
           duration: item.type === 'food' ? 90 : 120,
-          note: item.note
+          note: item.note,
+          original_url: item.original_url  // 保留原始链接
         }))
       })
     }
