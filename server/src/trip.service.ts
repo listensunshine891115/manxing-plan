@@ -13,6 +13,7 @@ interface InspirationInput {
   time?: string
   price?: number
   rating?: number
+  original_url?: string  // 原始链接
 }
 
 interface TripInput {

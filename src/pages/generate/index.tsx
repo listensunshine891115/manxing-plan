@@ -29,6 +29,7 @@ interface InspirationItem {
   location_lng?: number
   rating?: number
   note?: string
+  original_url?: string  // 原始链接
 }
 
 // 路线规划结果类型
@@ -320,7 +321,8 @@ export default function Generate() {
           : undefined,
         location_str: ins.location_name,
         rating: ins.rating,
-        note: ins.note
+        note: ins.note,
+        original_url: ins.original_url  // 保存原始链接
       }))
 
       const requestData: any = {

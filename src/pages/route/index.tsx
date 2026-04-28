@@ -22,6 +22,7 @@ interface RouteItem {
   location: { name: string; lat: number; lng: number }
   locationSource?: 'original' | 'mock'
   distance?: number
+  original_url?: string  // 原始链接
 }
 
 interface ItineraryItem {
@@ -35,6 +36,7 @@ interface ItineraryItem {
   duration: number
   distance?: number
   note?: string
+  original_url?: string  // 原始链接
 }
 
 interface TripDay {
@@ -517,6 +519,19 @@ export default function Route() {
                             <Text className="block text-xs text-orange-500 mt-1">
                               {item.note}
                             </Text>
+                          )}
+                          {/* 原始链接标签 */}
+                          {item.original_url && (
+                            <View 
+                              className="mt-2 px-2 py-1 bg-blue-50 rounded-lg inline-flex items-center"
+                              onClick={() => {
+                                Taro.setClipboardData({ data: item.original_url! })
+                                Taro.showToast({ title: '链接已复制', icon: 'success' })
+                              }}
+                            >
+                              <Text className="text-xs text-blue-600">来源链接</Text>
+                              <Text className="text-xs text-gray-400 ml-1">↗</Text>
+                            </View>
                           )}
                         </View>
                         <Button variant="ghost" size="icon" className="shrink-0">
