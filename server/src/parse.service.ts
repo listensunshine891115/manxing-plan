@@ -593,7 +593,23 @@ export class ParseService {
     try {
       console.log(`[Parse] 使用本地 ASR 服务提取字幕: ${url}`)
 
+      // 先尝试使用 B站 API 直接获取视频并提取字幕
+      if (url.includes('bilibili.com') || url.includes('b23.tv')) {
+        try {
+          console.log(`[Parse] 尝试使用 B站 API 提取字幕`)
+          const bilibiliResult = await this.extractBilibiliSubtitle(url)
+          if (bilibiliResult) {
+            console.log(`[Parse] B站字幕提取成功，长度: ${bilibiliResult.length}`)
+            return bilibiliResult
+          }
+          console.log(`[Parse] B站 API 返回为空，继续其他方式`)
+        } catch (e: any) {
+          console.log(`[Parse] B站 API 提取失败: ${e.message}，继续其他方式`)
+        }
+      }
+
       // 使用 VideoParseService 提取字幕
+      console.log(`[Parse] 使用 VideoParseService 提取字幕`)
       const result = await this.videoParseService.extractTextFromVideo(url)
 
       if (result.success && result.text) {
@@ -605,6 +621,98 @@ export class ParseService {
       return null
     } catch (error: any) {
       console.error(`[Parse] 字幕提取失败:`, error)
+      return null
+    }
+  }
+
+  // 专门处理 B站视频：使用 API 获取视频信息，然后提取字幕或描述
+  private async extractBilibiliSubtitle(url: string): Promise<string | null> {
+    try {
+      console.log(`[Parse] 使用 B站 API 提取字幕: ${url}`)
+
+      // 提取 BVID
+      const bvidMatch = url.match(/BV[\w]+/)
+      if (!bvidMatch) {
+        console.log(`[Parse] 无法提取 BVID`)
+        return null
+      }
+      const bvid = bvidMatch[0]
+
+      // 获取视频信息（包括 cid 和描述）
+      const apiUrl = `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`
+      const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.bilibili.com/'
+      }
+      
+      const response = await fetch(apiUrl, { headers })
+      const data = await response.json()
+
+      if (data.code !== 0 || !data.data) {
+        console.log(`[Parse] B站 API 请求失败: ${data.message}`)
+        return null
+      }
+
+      const cid = data.data.cid
+      const title = data.data.title
+      const description = data.data.desc || ''
+      console.log(`[Parse] B站视频信息: ${title}, cid: ${cid}`)
+
+      // 尝试获取字幕
+      const subtitleApi = `https://api.bilibili.com/x/web-interface/subtitle/list?bvid=${bvid}&cid=${cid}`
+      const subtitleResponse = await fetch(subtitleApi, { headers })
+      const subtitleData = await subtitleResponse.json()
+
+      if (subtitleData.code === 0 && subtitleData.data?.subtitles?.length > 0) {
+        // 有字幕，下载并提取
+        for (const subtitle of subtitleData.data.subtitles) {
+          const subtitleUrl = subtitle.subtitle_url
+          if (subtitleUrl) {
+            console.log(`[Parse] 发现字幕: ${subtitle.lan_doc}`)
+            try {
+              const subtitleContent = await fetch(subtitleUrl, { headers }).then(r => r.json())
+              if (subtitleContent && subtitleContent.body) {
+                const text = subtitleContent.body.map((s: any) => s.content).join(' ')
+                console.log(`[Parse] 字幕提取成功，长度: ${text.length}`)
+                return text
+              }
+            } catch (e) {
+              console.log(`[Parse] 字幕下载失败: ${e}`)
+            }
+          }
+        }
+      }
+
+      // 没有字幕，使用描述和评论作为内容
+      console.log(`[Parse] 无字幕，使用描述作为内容`)
+      let content = `视频标题: ${title}\n`
+      if (description) {
+        content += `视频描述: ${description}\n`
+      }
+
+      // 尝试获取热门评论
+      try {
+        const commentApi = `https://api.bilibili.com/x/v2/reply?type=1&oid=${cid}&pn=1&ps=20&sort=2`
+        const commentResponse = await fetch(commentApi, { headers })
+        const commentData = await commentResponse.json()
+        
+        if (commentData.code === 0 && commentData.data?.replies) {
+          const hotComments = commentData.data.replies.slice(0, 10)
+          content += '\n热门评论:\n'
+          for (const comment of hotComments) {
+            if (comment.content?.message) {
+              content += `- ${comment.content.message}\n`
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`[Parse] 评论获取失败: ${e}`)
+      }
+
+      console.log(`[Parse] B站内容提取成功，长度: ${content.length}`)
+      return content.length > 50 ? content : null
+    } catch (error: any) {
+      console.error(`[Parse] B站字幕提取失败:`, error.message)
       return null
     }
   }

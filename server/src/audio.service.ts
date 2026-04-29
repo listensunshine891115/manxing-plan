@@ -23,23 +23,38 @@ export class AudioService {
   /**
    * 从视频 URL 提取音频
    * @param videoUrl 视频链接
+   * @param headers 可选的请求头
    * @returns 音频文件路径
    */
-  async extractAudioFromUrl(videoUrl: string): Promise<string> {
+  async extractAudioFromUrl(videoUrl: string, headers?: Record<string, string>): Promise<string> {
     console.log(`[Audio] 开始提取音频: ${videoUrl}`)
 
     const timestamp = Date.now()
     const tempDir = this.tempDir
 
+    // 确保临时目录存在
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true })
+    }
+
     try {
       // 1. 使用 yt-dlp 下载并提取音频为 wav
       const tempOutput = path.join(tempDir, `temp_${timestamp}`)
 
-      // 简化命令，不指定格式选择
-      const cmd = `yt-dlp --extract-audio --audio-format wav --audio-quality 0 -o "${tempOutput}.%(ext)s" --no-playlist --no-check-certificate "${videoUrl}"`
+      // 构建 yt-dlp 命令
+      let cmd = `yt-dlp --extract-audio --audio-format wav --audio-quality 0 -o "${tempOutput}.%(ext)s" --no-playlist --no-check-certificate`
+      
+      // 如果有 headers，添加为额外 headers
+      if (headers) {
+        for (const [key, value] of Object.entries(headers)) {
+          cmd += ` --add-header "${key}: ${value}"`
+        }
+      }
+      
+      cmd += ` "${videoUrl}"`
       
       console.log(`[Audio] 执行命令: ${cmd}`)
-      execSync(cmd, { stdio: 'pipe', shell: '/bin/bash' })
+      execSync(cmd, { stdio: 'pipe', shell: '/bin/bash', timeout: 120000 })
 
       // 查找生成的 wav 文件
       const files = fs.readdirSync(tempDir)
@@ -57,21 +72,28 @@ export class AudioService {
     } catch (error) {
       console.error(`[Audio] 提取音频失败:`, error)
       
-      // 尝试备用方案：使用 ffmpeg 直接处理
+      // 尝试备用方案：使用 ffmpeg 直接下载并转换
       const outputPath = path.join(tempDir, `audio_${timestamp}.wav`)
-      return await this.fallbackExtract(videoUrl, outputPath)
+      return await this.fallbackExtract(videoUrl, outputPath, headers)
     }
   }
 
   /**
    * 备用方案：使用 ffmpeg 直接处理
    */
-  private async fallbackExtract(videoUrl: string, outputPath: string): Promise<string> {
+  private async fallbackExtract(videoUrl: string, outputPath: string, headers?: Record<string, string>): Promise<string> {
     try {
-      // 使用 ffmpeg 直接从 URL 提取音频
-      const cmd = `ffmpeg -i "${videoUrl}" -vn -acodec pcm_s16le -ar 16000 -ac 1 -y "${outputPath}"`
+      // 构建 ffmpeg headers 参数
+      let headersArg = ''
+      if (headers) {
+        for (const [key, value] of Object.entries(headers)) {
+          headersArg += ` -headers "${key}: ${value}"`
+        }
+      }
+      
+      const cmd = `ffmpeg -i "${videoUrl}"${headersArg} -vn -acodec pcm_s16le -ar 16000 -ac 1 -y "${outputPath}"`
       console.log(`[Audio] ffmpeg 备用方案: ${cmd}`)
-      execSync(cmd, { stdio: 'pipe', shell: '/bin/bash' })
+      execSync(cmd, { stdio: 'pipe', shell: '/bin/bash', timeout: 120000 })
       return outputPath
     } catch (error) {
       console.error(`[Audio] ffmpeg 备用方案也失败:`, error)
