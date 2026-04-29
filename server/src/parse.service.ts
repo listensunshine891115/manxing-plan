@@ -108,34 +108,22 @@ export class ParseService {
           } else {
             // 降级1：尝试用 yt-dlp 获取视频信息
             const ytDlpResult = await this.getVideoInfoWithYtDlp(url)
-            if (ytDlpResult.success) {
-              content = ytDlpResult.description || ytDlpResult.title || ''
+            if (ytDlpResult.success && ytDlpResult.description) {
+              content = ytDlpResult.description
               title = ytDlpResult.title || '未命名'
               coverImage = ytDlpResult.thumbnail || ''
             } else {
-              // 降级2：用 fetch 获取页面内容（可能失败）
-              const fetchResult = await this.fetchUrl(url)
+              // 降级2：用 Playwright 尝试获取页面内容
+              const fetchResult = await this.fetchUrlWithPlaywright(url)
               if (!fetchResult.success) {
-                // 降级3：直接返回原始文字内容
+                // 所有方式都失败了，返回失败并给出提示
                 return {
-                  success: true,
-                  data: {
-                    name: this.extractTextFromInput(input.url || input.text || ''),
-                    source: '社交短视频平台',
-                    type: '视频',
-                    location_name: '',
-                    time: '',
-                    price: '',
-                    description: input.url || input.text || '',
-                    tags: [],
-                    original_url: url,
-                  },
-                  message: '已收录，但未能获取详细信息'
+                  success: false,
+                  message: '无法获取视频内容。小红书等内容平台需要登录，建议复制视频的文字描述（如视频下方的文案）粘贴到输入框中，这样我可以更好地提取灵感点。'
                 }
               }
               content = fetchResult.content || ''
-              title = fetchResult.title || '未命名'
-              coverImage = fetchResult.coverImage || ''
+              title = fetchResult.title || ''
             }
           }
         } else {
@@ -1710,5 +1698,100 @@ ${content || '(无正文内容)'}
     }
 
     return results
+  }
+
+  // 使用 Playwright 获取页面内容（针对需要 JS 渲染的页面）
+  private async fetchUrlWithPlaywright(url: string): Promise<{
+    success: boolean
+    content?: string
+    title?: string
+    message?: string
+  }> {
+    let browser: playwright.Browser | null = null
+    try {
+      console.log(`[Parse] 使用 Playwright 获取页面: ${url}`)
+      
+      browser = await playwright.chromium.launch({ 
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+      })
+      const page = await browser.newPage()
+      
+      // 设置移动端 User-Agent
+      await page.setExtraHTTPHeaders({
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+      })
+      
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 })
+      await page.waitForTimeout(2000)
+      
+      const content = await page.evaluate(() => {
+        // 获取正文内容
+        const selectors = [
+          '.note-content', '.note-detail-content', '#detail-content',
+          '.content', '.main-content', 'article', 'main', '.desc',
+          '[class*="desc"]', '[class*="note"]', '[class*="content"]'
+        ]
+        
+        let mainContent = ''
+        for (const selector of selectors) {
+          const el = document.querySelector(selector as string) as HTMLElement | null
+          if (el) {
+            const text = el.innerText || el.textContent || ''
+            if (text.length > mainContent.length) {
+              mainContent = text
+            }
+          }
+        }
+        
+        if (!mainContent || mainContent.length < 50) {
+          mainContent = document.body.innerText || document.body.textContent || ''
+        }
+        
+        mainContent = mainContent.replace(/\s+/g, ' ').trim()
+        
+        // 检查是否是首页推荐
+        const homepageIndicators = ['推荐', '穿搭', '美食', '彩妆', '影视']
+        const isHomepage = homepageIndicators.every(ind => mainContent.includes(ind))
+        if (isHomepage && mainContent.length < 1000) {
+          return ''
+        }
+        
+        if (mainContent.length > 5000) {
+          mainContent = mainContent.slice(0, 5000)
+        }
+        
+        return mainContent
+      })
+      
+      // 获取标题
+      const title = await page.title()
+      
+      console.log(`[Parse] Playwright 获取内容长度: ${content?.length || 0}`)
+      
+      // 严格的内容质量检查
+      if (!content || content.length < 100) {
+        return {
+          success: false,
+          message: '无法获取视频内容。小红书等内容平台需要登录，建议复制视频的文字描述（如视频下方的文案）粘贴到输入框中。'
+        }
+      }
+      
+      return {
+        success: true,
+        content,
+        title
+      }
+    } catch (error: any) {
+      console.error(`[Parse] Playwright 获取失败:`, error.message)
+      return {
+        success: false,
+        message: `Playwright 获取失败: ${error.message}`
+      }
+    } finally {
+      if (browser) {
+        await browser.close().catch(() => {})
+      }
+    }
   }
 }

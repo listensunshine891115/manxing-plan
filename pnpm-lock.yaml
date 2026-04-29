@@ -218,9 +218,6 @@ importers:
       pg:
         specifier: ^8.16.3
         version: 8.17.2
-      playwright:
-        specifier: ^1.59.1
-        version: 1.59.1
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
@@ -246,6 +243,9 @@ importers:
       '@types/uuid':
         specifier: ^11.0.0
         version: 11.0.0
+      playwright:
+        specifier: ^1.59.1
+        version: 1.59.1
       typescript:
         specifier: ^5.7.2
         version: 5.9.3

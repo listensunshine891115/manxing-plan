@@ -233,8 +233,21 @@ export class VideoParseService {
       })
       
       console.log(`[VideoParse] Playwright 降级获取内容长度: ${content.length}`)
+      console.log(`[VideoParse] Playwright 降级内容预览: ${content.substring(0, 500)}`)
       
+      // 检查内容质量：过滤掉首页推荐等无意义内容
       if (content && content.length > 20) {
+        const homepageIndicators = ['推荐', '穿搭', '美食', '彩妆', '影视', '职场', '情感', '家居', '游戏', '旅行', '健身']
+        const isHomepageContent = homepageIndicators.every(indicator => content.includes(indicator))
+        
+        if (isHomepageContent && content.length < 1000) {
+          console.log(`[VideoParse] 检测到小红书首页推荐内容，内容质量不足`)
+          return {
+            success: false,
+            error: '需要登录才能查看此内容。请复制视频的文字描述粘贴到输入框中。',
+          }
+        }
+        
         return {
           success: true,
           text: content,
@@ -244,7 +257,7 @@ export class VideoParseService {
       
       return {
         success: false,
-        error: '无法获取小红书内容',
+        error: '无法获取小红书内容，请复制视频的文字描述粘贴到输入框中',
       }
     } catch (error: any) {
       console.error(`[VideoParse] Playwright 降级失败:`, error.message)
