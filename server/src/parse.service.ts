@@ -6,6 +6,8 @@ import { AudioService } from './audio.service'
 import { VideoParseService } from './video-parse.service'
 import { execSync } from 'child_process'
 import * as playwright from 'playwright'
+import * as fs from 'fs'
+import * as path from 'path'
 
 // 类型映射：中文 -> 中文一级标签
 const primaryTagMap: Record<string, string> = {
@@ -18,6 +20,15 @@ const primaryTagMap: Record<string, string> = {
   '饮品': '美食',
   '咖啡': '美食',
   '默认': '景点',
+}
+
+// 小红书 cookies 配置路径
+const XHS_COOKIES_PATH = path.join(process.cwd(), 'config', 'xhs_cookies.json')
+
+interface XiaoHongShuCookies {
+  cookies: string
+  user_agent: string
+  update_time?: string
 }
 
 function normalizePrimaryTag(tag: string): string {
@@ -65,6 +76,55 @@ export class ParseService {
     this.fetchClient = new FetchClient(config)
     this.llmClient = new LLMClient(config)
     this.videoParseService = new VideoParseService(this.audioService, this.asrService)
+    
+    // 加载小红书 cookies（如果存在）
+    this.loadXiaoHongShuCookies()
+  }
+
+  // 加载小红书 cookies
+  private loadXiaoHongShuCookies(): XiaoHongShuCookies | null {
+    try {
+      if (fs.existsSync(XHS_COOKIES_PATH)) {
+        const data = fs.readFileSync(XHS_COOKIES_PATH, 'utf-8')
+        const cookies: XiaoHongShuCookies = JSON.parse(data)
+        const updateTime = cookies.update_time ? new Date(cookies.update_time) : null
+        const now = new Date()
+        const daysDiff = updateTime ? (now.getTime() - updateTime.getTime()) / (1000 * 60 * 60 * 24) : 999
+        
+        if (daysDiff > 7) {
+          console.log(`[Parse] 小红书 cookies 已过期（${Math.floor(daysDiff)}天前更新），建议重新获取`)
+        } else {
+          console.log(`[Parse] 已加载小红书 cookies（${daysDiff < 1 ? '今天' : Math.floor(daysDiff) + '天前'}更新）`)
+        }
+        return cookies
+      }
+    } catch (e: any) {
+      console.error(`[Parse] 加载小红书 cookies 失败:`, e.message)
+    }
+    console.log(`[Parse] 未配置小红书 cookies，小红书视频需要登录才能获取内容`)
+    return null
+  }
+
+  // 设置小红书 cookies（供管理员调用）
+  async setXiaoHongShuCookies(cookies: string, user_agent: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const configDir = path.dirname(XHS_COOKIES_PATH)
+      if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir, { recursive: true })
+      }
+      
+      const data: XiaoHongShuCookies = {
+        cookies,
+        user_agent,
+        update_time: new Date().toISOString()
+      }
+      
+      fs.writeFileSync(XHS_COOKIES_PATH, JSON.stringify(data, null, 2))
+      console.log(`[Parse] 小红书 cookies 已保存`)
+      return { success: true, message: '小红书 cookies 设置成功' }
+    } catch (e: any) {
+      return { success: false, message: `设置失败: ${e.message}` }
+    }
   }
 
   // 主解析入口
@@ -872,6 +932,9 @@ export class ParseService {
     try {
       console.log(`[Parse] 小红书内容，使用 Playwright 渲染获取: ${url}`)
       
+      // 加载 cookies 配置
+      const cookiesConfig = this.loadXiaoHongShuCookies()
+      
       // 先解析短链接
       let realUrl = url
       if (url.includes('xhslink.com')) {
@@ -895,8 +958,32 @@ export class ParseService {
       
       // 设置视口和用户代理（移动端）
       await page.setViewportSize({ width: 375, height: 812 })
+      
+      // 如果有 cookies 配置，设置 cookies
+      if (cookiesConfig) {
+        try {
+          const cookies = JSON.parse(cookiesConfig.cookies)
+          if (Array.isArray(cookies)) {
+            for (const cookie of cookies) {
+              await page.context().addCookies([{
+                name: cookie.name,
+                value: cookie.value,
+                domain: cookie.domain || '.xiaohongshu.com',
+                path: cookie.path || '/'
+              }])
+            }
+            console.log(`[Parse] 已设置 ${cookies.length} 个小红书 cookies`)
+          }
+        } catch (e) {
+          console.log(`[Parse] 解析 cookies 失败，尝试其他方式`)
+        }
+      }
+      
+      // 设置用户代理
+      const userAgent = cookiesConfig?.user_agent || 
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
       await page.setExtraHTTPHeaders({
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+        'User-Agent': userAgent
       })
       
       // 访问页面并等待内容加载
@@ -1711,15 +1798,41 @@ ${content || '(无正文内容)'}
     try {
       console.log(`[Parse] 使用 Playwright 获取页面: ${url}`)
       
+      // 检查是否是小红书链接
+      const isXiaoHongShu = url.includes('xiaohongshu.com') || url.includes('xhslink.com')
+      const cookiesConfig = isXiaoHongShu ? this.loadXiaoHongShuCookies() : null
+      
       browser = await playwright.chromium.launch({ 
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       })
       const page = await browser.newPage()
       
-      // 设置移动端 User-Agent
+      // 如果是小红书且有 cookies，设置 cookies
+      if (isXiaoHongShu && cookiesConfig) {
+        try {
+          const cookies = JSON.parse(cookiesConfig.cookies)
+          if (Array.isArray(cookies)) {
+            for (const cookie of cookies) {
+              await page.context().addCookies([{
+                name: cookie.name,
+                value: cookie.value,
+                domain: cookie.domain || '.xiaohongshu.com',
+                path: cookie.path || '/'
+              }])
+            }
+            console.log(`[Parse] 已设置 ${cookies.length} 个小红书 cookies`)
+          }
+        } catch (e) {
+          console.log(`[Parse] 解析 cookies 失败`)
+        }
+      }
+      
+      // 设置用户代理
+      const userAgent = cookiesConfig?.user_agent || 
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
       await page.setExtraHTTPHeaders({
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+        'User-Agent': userAgent
       })
       
       await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 })

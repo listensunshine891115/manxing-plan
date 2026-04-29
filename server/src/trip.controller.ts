@@ -72,6 +72,14 @@ export class TripController {
     return { code: 200, msg: 'success', ...result }
   }
 
+  // 设置小红书 cookies（用于登录后访问需要认证的内容）
+  @Post('xhs-cookies')
+  async setXiaoHongShuCookies(@Body() body: { cookies: string; user_agent: string }) {
+    console.log(`[POST] /api/trip/xhs-cookies`)
+    const result = await this.parseService.setXiaoHongShuCookies(body.cookies, body.user_agent)
+    return { code: 200, msg: result.message, success: result.success }
+  }
+
   // 预览多个灵感点（从字幕中提取）
   @Post('preview')
   async previewInspirations(@Body() body: { userId: string; url?: string; text?: string }) {

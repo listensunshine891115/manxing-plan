@@ -12,7 +12,8 @@ export default defineAppConfig({
     'pages/vote/index',
     'pages/vote-result/index',
     'pages/preview/index',
-    'pages/webview/index'
+    'pages/webview/index',
+    'pages/xhs-cookies/index'
   ],
   window: {
     backgroundTextStyle: 'light',

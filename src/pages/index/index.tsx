@@ -776,6 +776,16 @@ export default function Index() {
               <Text className="text-white ml-1">选择灵感</Text>
             </Button>
           </View>
+          
+          {/* 小红书 cookies 设置入口 */}
+          <View 
+            className="mt-2 pt-2 border-t border-gray-100"
+            onClick={() => Taro.navigateTo({ url: '/pages/xhs-cookies/index' })}
+          >
+            <Text className="block text-xs text-gray-400 text-center">
+              小红书收录异常？点击设置登录
+            </Text>
+          </View>
         </View>
       )}
 
