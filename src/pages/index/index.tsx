@@ -518,19 +518,22 @@ export default function Index() {
             直接粘贴种草短视频、票务平台、公众号文章&quot;分享链接&quot;，或输入文字灵感
           </Text>
           <View className="flex gap-2">
-            <View className="flex-1 bg-white rounded-lg px-3 py-2 flex items-center">
+            <View className="flex-1 bg-white rounded-lg px-3 py-2 flex items-center relative">
               <Input 
-                className="flex-1 text-sm"
+                className="flex-1 text-sm pr-6"
                 placeholder="粘贴链接或输入文字..."
                 value={linkInput}
                 onInput={(e: any) => setLinkInput(e.target.value)}
               />
               {linkInput && (
                 <View 
-                  className="ml-2 w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  style={{ padding: '4px' }}
                   onClick={() => setLinkInput('')}
                 >
-                  <X size={12} color="#6b7280" />
+                  <View className="w-5 h-5 rounded-full bg-gray-300 flex items-center justify-center">
+                    <Text className="text-gray-600" style={{ fontSize: '10px', lineHeight: '10px' }}>×</Text>
+                  </View>
                 </View>
               )}
             </View>
