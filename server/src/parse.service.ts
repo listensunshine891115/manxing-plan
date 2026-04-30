@@ -668,9 +668,15 @@ export class ParseService {
         for (const subtitle of subtitleData.data.subtitles) {
           const subtitleUrl = subtitle.subtitle_url
           if (subtitleUrl) {
-            console.log(`[Parse] 发现字幕: ${subtitle.lan_doc}`)
+            console.log(`[Parse] 发现字幕: ${subtitle.lan_doc}, URL: ${subtitleUrl}`)
             try {
-              const subtitleContent = await fetch(subtitleUrl, { headers }).then(r => r.json())
+              // 字幕 URL 需要特殊的 Referer header
+              const subtitleHeaders = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': `https://www.bilibili.com/video/${bvid}/`
+              }
+              const subtitleResponse = await fetch(subtitleUrl, { headers: subtitleHeaders })
+              const subtitleContent = await subtitleResponse.json()
               if (subtitleContent && subtitleContent.body) {
                 const text = subtitleContent.body.map((s: any) => s.content).join(' ')
                 console.log(`[Parse] 字幕提取成功，长度: ${text.length}`)

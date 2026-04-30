@@ -233,21 +233,10 @@ export class VideoParseService {
       })
       
       console.log(`[VideoParse] Playwright 降级获取内容长度: ${content.length}`)
-      console.log(`[VideoParse] Playwright 降级内容预览: ${content.substring(0, 500)}`)
       
-      // 检查内容质量：过滤掉首页推荐等无意义内容
+      // 移除首页推荐检测，改为直接返回获取到的内容
+      // v1.2.0 版本行为：即使是小红书首页推荐内容，也尝试让 LLM 提取灵感点
       if (content && content.length > 20) {
-        const homepageIndicators = ['推荐', '穿搭', '美食', '彩妆', '影视', '职场', '情感', '家居', '游戏', '旅行', '健身']
-        const isHomepageContent = homepageIndicators.every(indicator => content.includes(indicator))
-        
-        if (isHomepageContent && content.length < 1000) {
-          console.log(`[VideoParse] 检测到小红书首页推荐内容，内容质量不足`)
-          return {
-            success: false,
-            error: '需要登录才能查看此内容。请复制视频的文字描述粘贴到输入框中。',
-          }
-        }
-        
         return {
           success: true,
           text: content,
