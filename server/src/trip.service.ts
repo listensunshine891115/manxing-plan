@@ -470,7 +470,8 @@ export class TripService {
         type: ins.type,
         location: { name: ins.location_str || ins.title, ...mockLoc },
         locationSource: 'mock' as const,
-        note: ins.note
+        note: ins.note,
+        original_url: ins.original_url
       }
     })
 
