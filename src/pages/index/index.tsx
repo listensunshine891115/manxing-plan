@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { 
-  Sparkles, MapPin, Calendar, Check, User, Settings, Link2,
+  Sparkles, MapPin, Calendar, Check, Settings, Link2,
   X, ChevronRight, ChevronDown, Trash2, Plus, Heart, Clock, Footprints,
   Camera
 } from 'lucide-react-taro'
@@ -65,7 +65,13 @@ export default function Index() {
   const [showOfficialAccount, setShowOfficialAccount] = useState(false)
   const [qrCodeLoaded, setQrCodeLoaded] = useState(false)
 
-  // 检查登录状态
+  // 生成用户码
+  const generateUserCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  }
+
+  // 检查登录状态 - 自动成为访客用户
   const checkLogin = async () => {
     try {
       const res = await Taro.getStorage({ key: 'userInfo' })
@@ -76,7 +82,17 @@ export default function Index() {
     } catch {
       // 未登录
     }
-    return null
+    // 自动创建访客用户
+    const guestUser = {
+      id: 'guest_' + Date.now(),
+      openid: '',
+      nickname: '旅行者',
+      user_code: generateUserCode(),
+      wx_openid: ''
+    }
+    await Taro.setStorage({ key: 'userInfo', data: guestUser })
+    setUserInfo(guestUser)
+    return guestUser
   }
 
   // 加载灵感列表
@@ -130,32 +146,6 @@ export default function Index() {
     await Promise.all([fetchInspirations(), fetchTrips()])
     setRefreshing(false)
     Taro.showToast({ title: '刷新成功', icon: 'success' })
-  }
-
-  // 微信登录
-  const handleLogin = async () => {
-    try {
-      const user = {
-        id: 'user_' + Date.now(),
-        openid: 'wx_test_' + Date.now(),
-        nickname: '旅行者',
-        user_code: generateUserCode(),
-        wx_openid: ''
-      }
-      await Taro.setStorage({ key: 'userInfo', data: user })
-      setUserInfo(user)
-      Taro.showToast({ title: '登录成功', icon: 'success' })
-      setTimeout(() => {
-        Taro.redirectTo({ url: '/pages/bind-guide/index' })
-      }, 500)
-    } catch {
-      Taro.showToast({ title: '登录失败', icon: 'none' })
-    }
-  }
-
-  const generateUserCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
   }
 
   // 粘贴链接收录
@@ -440,26 +430,6 @@ export default function Index() {
   const openCategory = (tag: string) => {
     setCurrentCategory(tag)
     setShowCategoryDialog(true)
-  }
-
-  // 未登录状态
-  if (!userInfo) {
-    return (
-      <View className="min-h-screen bg-background flex flex-col items-center justify-center px-8">
-        {/* Logo 和名称 */}
-        <View className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-6 shadow-lg">
-          <Sparkles size={48} color="#FFFFFF" />
-        </View>
-        <Text className="block text-2xl font-bold text-foreground mb-1">此刻与你漫行</Text>
-        <Text className="block text-sm text-muted-foreground mb-8 text-center">
-          记录美好旅程 · 规划完美路线{'\n'}绑定公众号发送链接自动收录灵感
-        </Text>
-        <Button className="bg-blue-500 w-full max-w-xs" onClick={handleLogin}>
-          <User size={18} color="#fff" />
-          <Text className="text-white ml-2">微信一键登录</Text>
-        </Button>
-      </View>
-    )
   }
 
   // 已登录状态
