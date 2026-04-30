@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { View, Text, Image, Picker } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -7,10 +7,10 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { 
   ArrowLeft, Share2, ChevronUp, ChevronDown, MapPin, Clock, 
-  Navigation, Sparkles, Route as RouteIcon, Circle, Users, ThumbsUp, X, Plus
+  Navigation, Sparkles, Route as RouteIcon, Circle, Users, ThumbsUp, X, Plus, Copy
 } from 'lucide-react-taro'
 import { Network } from '@/network'
-import Taro from '@tarojs/taro'
+import Taro, { useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import './index.css'
 
 // 类型定义
@@ -86,6 +86,59 @@ export default function Route() {
   const [voteSession, setVoteSession] = useState<{ shareCode: string; sessionId: string; voteDeadline: string } | null>(null)
   const [voteStats, setVoteStats] = useState<Record<string, { likes: number; dislikes: number }>>({})
   const [voteSettingVisible, setVoteSettingVisible] = useState(false)
+  
+  // 当前路线分享代码
+  const [shareCode] = useState(() => {
+    const pages = Taro.getCurrentPages()
+    const currentPage = pages[pages.length - 1]
+    const options = (currentPage as any)?.options || {}
+    return options.code || options.shareCode || ''
+  })
+  
+  // 分享给微信好友
+  useShareAppMessage(() => {
+    const tripId = routePlan?.settings?.mainDestination || 'trip'
+    const days = routePlan?.settings?.days || 3
+    return {
+      title: `【漫行计划】${tripId} ${days}日游路线`,
+      path: `/pages/route/index?code=${shareCode}`,
+      imageUrl: routePlan?.itinerary?.[0]?.items?.[0]?.image || ''
+    }
+  })
+  
+  // 分享到朋友圈
+  useShareTimeline(() => {
+    const tripId = routePlan?.settings?.mainDestination || 'trip'
+    const days = routePlan?.settings?.days || 3
+    return {
+      title: `【漫行计划】${tripId} ${days}日游路线，等你来投票！`,
+      query: `code=${shareCode}`
+    }
+  })
+  
+  // 分享链接给好友
+  const handleShareToFriend = useCallback(() => {
+    const shareUrl = `${PROJECT_DOMAIN || ''}/pages/route/index?code=${shareCode}`
+    const tripId = routePlan?.settings?.mainDestination || '漫行计划'
+    const days = routePlan?.settings?.days || 3
+    
+    Taro.showModal({
+      title: '分享路线给好友',
+      content: `${tripId} ${days}日游路线\n\n好友打开链接即可查看路线并参与投票！\n\n链接：${shareUrl}`,
+      confirmText: '复制链接',
+      cancelText: '关闭',
+      success: (res) => {
+        if (res.confirm) {
+          Taro.setClipboardData({
+            data: shareUrl,
+            success: () => {
+              Taro.showToast({ title: '链接已复制', icon: 'success' })
+            }
+          })
+        }
+      }
+    })
+  }, [shareCode, routePlan])
   
   // 获取北京时间日期字符串 (格式: YYYY-MM-DD)
   const [voteSetting, setVoteSetting] = useState({
@@ -250,27 +303,27 @@ export default function Route() {
       console.log('[Route] 创建投票会话响应:', res.data)
 
       if (res.data.code === 200 && res.data.data) {
-        const { shareCode, sessionId, voteDeadline } = res.data.data
-        setVoteSession({ shareCode, sessionId, voteDeadline })
+        const { shareCode: newShareCode, sessionId: newSessionId, voteDeadline: newVoteDeadline } = res.data.data
+        setVoteSession({ shareCode: newShareCode, sessionId: newSessionId, voteDeadline: newVoteDeadline })
 
         // 加载投票统计
-        loadVoteStats(sessionId)
+        loadVoteStats(newSessionId)
 
         // 生成分享链接
-        const shareUrl = `/pages/vote/index?code=${shareCode}`
+        const voteShareUrl = `/pages/vote/index?code=${newShareCode}`
 
         Taro.hideLoading()
 
         // 显示分享选项
         Taro.showModal({
           title: '投票已创建！',
-          content: `截止时间：${new Date(voteDeadline).toLocaleString('zh-CN')}\n\n好友打开链接即可投票`,
+          content: `截止时间：${new Date(newVoteDeadline).toLocaleString('zh-CN')}\n\n好友打开链接即可投票`,
           confirmText: '复制链接',
           cancelText: '稍后',
           success: (modalRes) => {
             if (modalRes.confirm) {
               Taro.setClipboardData({
-                data: shareUrl,
+                data: voteShareUrl,
                 success: () => {
                   Taro.showToast({ title: '链接已复制', icon: 'success' })
                 }
@@ -360,7 +413,7 @@ export default function Route() {
             </Button>
             <Text className="block text-lg font-semibold text-foreground ml-2">路线方案</Text>
           </View>
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" onClick={handleShareToFriend}>
             <Share2 size={20} color="#3B82F6" />
           </Button>
         </View>
@@ -597,7 +650,7 @@ export default function Route() {
             className={`flex-1 h-12 ${voteSession ? 'border-green-500' : ''}`}
             onClick={handleShareVote}
           >
-            <Share2 size={18} color={voteSession ? "#22C55E" : "#3B82F6"} className="mr-2" />
+            <Copy size={18} color={voteSession ? "#22C55E" : "#3B82F6"} className="mr-2" />
             <Text style={{ color: voteSession ? '#22C55E' : '#3B82F6' }}>
               {voteSession ? '分享投票' : '邀请投票'}
             </Text>
