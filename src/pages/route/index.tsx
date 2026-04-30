@@ -173,6 +173,38 @@ export default function Route() {
     loadRoutePlan()
   }, [])
 
+  // 注册分享到微信好友
+  useShareAppMessage(() => {
+    if (!routePlan || !shareCode) {
+      return {
+        title: '【漫行计划】旅行路线',
+        path: '/pages/index/index'
+      }
+    }
+    const destination = routePlan.settings.mainDestination || '未知目的地'
+    const days = routePlan.settings.days
+    return {
+      title: `【漫行计划】${destination} ${days}日游路线`,
+      path: `/pages/route/index?code=${shareCode}`
+    }
+  })
+
+  // 注册分享到朋友圈
+  useShareTimeline(() => {
+    if (!routePlan || !shareCode) {
+      return {
+        title: '【漫行计划】旅行路线',
+        path: '/pages/index/index'
+      }
+    }
+    const destination = routePlan.settings.mainDestination || '未知目的地'
+    const days = routePlan.settings.days
+    return {
+      title: `【漫行计划】${destination} ${days}日游路线，等你来投票！`,
+      path: `/pages/route/index?code=${shareCode}`
+    }
+  })
+
   const currentVersion = versions.find(v => v.id === activeVersion) || versions[0]
 
   const toggleDay = (day: number) => {
