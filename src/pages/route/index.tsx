@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Text, Image, Picker } from '@tarojs/components'
-import { Button } from '@/components/ui/button'
+import { Button as UIButton } from '@/components/ui/button'
+import { ShareButton } from '@/components/share-button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -115,6 +116,17 @@ export default function Route() {
       query: `code=${shareCode}`
     }
   })
+  
+  // 分享到微信好友
+  useShareAppMessage(() => {
+    const tripId = routePlan?.settings?.mainDestination || 'trip'
+    const days = routePlan?.settings?.days || 3
+    return {
+      title: `【漫行计划】${tripId} ${days}日游路线`,
+      path: `/pages/route/index?code=${shareCode}`
+    }
+  })
+  
   // 获取北京时间日期字符串 (格式: YYYY-MM-DD)
   const [voteSetting, setVoteSetting] = useState({
     startDate: '',
@@ -368,10 +380,10 @@ export default function Route() {
       <View className="min-h-screen bg-background flex items-center justify-center">
         <View className="text-center px-4">
           <Text className="block text-gray-500 mb-4">暂无路线规划结果</Text>
-          <Button onClick={handleRegenerate}>
+          <UIButton onClick={handleRegenerate}>
             <Sparkles size={16} color="#fff" />
             <Text className="text-white ml-2">重新规划</Text>
-          </Button>
+          </UIButton>
         </View>
       </View>
     )
@@ -383,15 +395,15 @@ export default function Route() {
       <View className="sticky top-0 z-10 bg-background border-b border-border px-4 py-3">
         <View className="flex items-center justify-between">
           <View className="flex items-center">
-            <Button variant="ghost" size="icon" onClick={() => Taro.navigateBack()}>
+            <UIButton variant="ghost" size="icon" onClick={() => Taro.navigateBack()}>
               <ArrowLeft size={24} color="#1E293B" />
-            </Button>
+            </UIButton>
             <Text className="block text-lg font-semibold text-foreground ml-2">路线方案</Text>
           </View>
-          {/* 使用 open-type="share" 触发微信分享 */}
-          <Button variant="ghost" size="icon" open-type="share">
+          {/* 使用 ShareButton 组件触发微信分享 */}
+          <ShareButton className="h-10 w-10 flex items-center justify-center">
             <Share2 size={20} color="#3B82F6" />
-          </Button>
+          </ShareButton>
         </View>
       </View>
 
@@ -572,9 +584,9 @@ export default function Route() {
                             </View>
                           )}
                         </View>
-                        <Button variant="ghost" size="icon" className="shrink-0">
+                        <UIButton variant="ghost" size="icon" className="shrink-0">
                           <Navigation size={18} color="#3B82F6" />
-                        </Button>
+                        </UIButton>
                       </View>
                     </View>
                   </View>
@@ -621,42 +633,38 @@ export default function Route() {
         }}
       >
         <View className="flex gap-3 mb-3">
-          {/* 分享投票按钮 - 有投票会话时使用 open-type="share" 触发微信分享，否则先创建投票 */}
+          {/* 分享投票按钮 - 有投票会话时使用 ShareButton 触发微信分享 */}
           {voteSession ? (
-            <Button
-              variant="outline"
-              className="flex-1 h-12 border-green-500"
-              open-type="share"
-            >
+            <ShareButton className="flex-1 h-12 bg-white border border-green-500 rounded-lg flex items-center justify-center">
               <Copy size={18} color="#22C55E" className="mr-2" />
               <Text style={{ color: '#22C55E' }}>分享投票</Text>
-            </Button>
+            </ShareButton>
           ) : (
-            <Button
+            <UIButton
               variant="outline"
               className="flex-1 h-12"
               onClick={handleShareVote}
             >
               <Copy size={18} color="#3B82F6" className="mr-2" />
               <Text style={{ color: '#3B82F6' }}>邀请投票</Text>
-            </Button>
+            </UIButton>
           )}
-          <Button
+          <UIButton
             className="flex-1 h-12 text-base font-medium"
             onClick={handleConfirm}
           >
             <Circle size={18} color="#fff" className="mr-2" />
             <Text className="text-white">确认行程</Text>
-          </Button>
+          </UIButton>
         </View>
-        <Button
+        <UIButton
           variant="ghost"
           className="w-full h-10 text-gray-500"
           onClick={handleRegenerate}
         >
           <RouteIcon size={16} color="#64748B" className="mr-2" />
           <Text className="text-gray-500">重新规划</Text>
-        </Button>
+        </UIButton>
       </View>
 
       {/* 投票设置弹窗 */}
@@ -786,9 +794,9 @@ export default function Route() {
                   onConfirm={handleAddMeetupPlace}
                   placeholder="输入地点后回车添加"
                 />
-                <Button size="sm" onClick={handleAddMeetupPlace}>
+                <UIButton size="sm" onClick={handleAddMeetupPlace}>
                   <Plus size={16} color="#fff" />
-                </Button>
+                </UIButton>
               </View>
             </View>
 
@@ -805,12 +813,12 @@ export default function Route() {
             </View>
 
             {/* 确认按钮 */}
-            <Button
+            <UIButton
               className="w-full py-3 bg-blue-500 text-white rounded-xl font-medium"
               onClick={handleConfirmVote}
             >
               <Text className="text-white">创建投票</Text>
-            </Button>
+            </UIButton>
           </View>
         </DialogContent>
       </Dialog>
