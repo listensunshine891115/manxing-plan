@@ -75,16 +75,18 @@ export default function Preview() {
 
   // 配置分享
   useShareAppMessage(() => {
+    const tripId = savedTrip?.settings?.mainDestination || 'trip'
     return {
-      title: savedTrip ? `${savedTrip.settings.startDate}旅行行程` : '我的旅行行程',
+      title: `【漫行计划】${tripId} 旅行行程`,
       path: '/pages/preview/index',
       imageUrl: ''
     }
   })
 
   useShareTimeline(() => {
+    const tripId = savedTrip?.settings?.mainDestination || 'trip'
     return {
-      title: savedTrip ? `${savedTrip.settings.startDate}旅行行程` : '我的旅行行程',
+      title: `【漫行计划】${tripId} 旅行行程`,
       imageUrl: ''
     }
   })
@@ -109,11 +111,7 @@ export default function Preview() {
     }
   }
 
-  const handleShare = () => {
-    Taro.showShareMenu({
-      withShareTicket: true
-    })
-  }
+  // 分享功能已通过 useShareAppMessage 配置，点击按钮即可分享
 
   const handleBackToHome = () => {
     Taro.switchTab({ url: '/pages/index/index' })
@@ -140,7 +138,6 @@ export default function Preview() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleShare}
             >
               <Share2 size={20} color="#3B82F6" />
             </Button>
@@ -323,7 +320,6 @@ export default function Preview() {
         >
           <Button
             className="w-full py-3 rounded-xl bg-green-500 text-white font-medium"
-            onClick={handleShare}
           >
             <Share2 size={18} color="#ffffff" className="mr-2" />
             <Text className="text-white">分享行程给朋友</Text>
