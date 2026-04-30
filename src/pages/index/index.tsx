@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { 
   Sparkles, MapPin, Calendar, Check, User, Settings, Link2,
-  X, ChevronRight, Trash2, Plus, Heart, Clock, Footprints,
+  X, ChevronRight, ChevronDown, Trash2, Plus, Heart, Clock, Footprints,
   Camera
 } from 'lucide-react-taro'
 import { Network } from '@/network'
@@ -46,6 +46,7 @@ export default function Index() {
 
   // 行程列表
   const [trips, setTrips] = useState<any[]>([])
+  const [showAllTrips, setShowAllTrips] = useState(false)
 
   // 预览灵感点弹窗
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
@@ -695,10 +696,23 @@ export default function Index() {
               {trips.length} 个
             </Badge>
           </View>
+          {trips.length > 3 && (
+            <View 
+              className="flex items-center text-sm text-blue-500"
+              onClick={() => setShowAllTrips(!showAllTrips)}
+            >
+              <Text className="mr-1">{showAllTrips ? '收起' : '查看全部'}</Text>
+              <ChevronDown 
+                size={16} 
+                color="#3b82f6" 
+                className={showAllTrips ? 'rotate-180' : ''} 
+              />
+            </View>
+          )}
         </View>
         {trips.length > 0 ? (
           <View className="space-y-3">
-            {trips.slice(0, 3).map((trip) => (
+            {trips.slice(0, showAllTrips ? trips.length : 3).map((trip) => (
               <View 
                 key={trip.id}
                 className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100"
@@ -714,7 +728,7 @@ export default function Index() {
                 }}
               >
                 <View className="flex items-center justify-between">
-                  <View className="flex items-center">
+                  <View className="flex items-center flex-1">
                     <Calendar size={14} color="#3b82f6" />
                     <Text className="block text-sm font-medium text-gray-900 ml-2">
                       {trip.version_name || '我的行程'}
@@ -725,12 +739,46 @@ export default function Index() {
                       </View>
                     )}
                   </View>
-                  <View className="flex items-center text-xs text-gray-500">
-                    <Clock size={12} color="#9ca3af" />
-                    <Text className="ml-1">
-                      {trip.settings?.days || 1}天行程
-                    </Text>
+                  <View className="flex items-center">
+                    <View 
+                      className="px-2 py-1 rounded text-xs text-gray-500 flex items-center"
+                      onClick={(e) => {
+                        e.stopPropagation?.()
+                        // 显示删除确认
+                        Taro.showModal({
+                          title: '确认删除',
+                          content: `确定要删除「${trip.version_name || '我的行程'}」吗？`,
+                          confirmText: '删除',
+                          confirmColor: '#ef4444',
+                          success: async (res) => {
+                            if (res.confirm) {
+                              try {
+                                await Network.request({
+                                  url: `/api/trip/${trip.id}`,
+                                  method: 'DELETE'
+                                })
+                                // 从列表中移除
+                                setTrips(trips.filter(t => t.id !== trip.id))
+                                Taro.showToast({ title: '已删除', icon: 'success' })
+                              } catch (err) {
+                                console.error('删除失败:', err)
+                                Taro.showToast({ title: '删除失败', icon: 'none' })
+                              }
+                            }
+                          }
+                        })
+                      }}
+                    >
+                      <Trash2 size={14} color="#9ca3af" />
+                      <Text className="ml-1">删除</Text>
+                    </View>
                   </View>
+                </View>
+                <View className="flex items-center mt-1 ml-5 text-xs text-gray-500">
+                  <Clock size={12} color="#9ca3af" />
+                  <Text className="ml-1">
+                    {trip.settings?.days || 1}天行程
+                  </Text>
                 </View>
                 {trip.settings?.startDate && (
                   <Text className="block text-xs text-gray-500 mt-1 ml-5">
