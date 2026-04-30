@@ -446,7 +446,7 @@ export default function Index() {
         <View className="flex items-center justify-between">
           <View className="flex items-center gap-2">
             <Sparkles size={18} color="#3b82f6" />
-            <Text className="text-sm font-medium text-gray-900">{userInfo.nickname}</Text>
+            <Text className="text-sm font-medium text-gray-900">{userInfo?.nickname || '旅行者'}</Text>
             <Badge variant="outline" className="text-xs font-mono">
               {userInfo.user_code}
             </Badge>
