@@ -448,7 +448,7 @@ export default function Index() {
             <Sparkles size={18} color="#3b82f6" />
             <Text className="text-sm font-medium text-gray-900">{userInfo?.nickname || '旅行者'}</Text>
             <Badge variant="outline" className="text-xs font-mono">
-              {userInfo.user_code}
+              {userInfo?.user_code || '000000'}
             </Badge>
           </View>
           
