@@ -129,6 +129,7 @@ export class TripController {
       location_str?: string
       rating?: number
       note?: string
+      original_url?: string
     }>
     mainDestination?: string
     days?: number

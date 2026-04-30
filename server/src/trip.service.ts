@@ -414,6 +414,7 @@ export class TripService {
       location_str?: string
       rating?: number
       note?: string
+      original_url?: string
     }>,
     mainDestination?: string,
     days: number = 1
@@ -425,6 +426,7 @@ export class TripService {
       type?: string
       location: { name: string; lat: number; lng: number }
       locationSource: 'original' | 'mock'
+      original_url?: string
     }>
     statistics: {
       totalPoints: number
@@ -442,6 +444,7 @@ export class TripService {
       location: { name: string; lat: number; lng: number }
       locationSource: 'original' | 'mock'
       note?: string
+      original_url?: string
     }
 
     // 获取每个点的坐标
@@ -454,7 +457,8 @@ export class TripService {
           type: ins.type,
           location: ins.location,
           locationSource: 'original' as const,
-          note: ins.note
+          note: ins.note,
+          original_url: ins.original_url
         }
       }
       // 使用模拟坐标
@@ -492,6 +496,7 @@ export class TripService {
       type?: string
       location: { name: string; lat: number; lng: number }
       locationSource: 'original' | 'mock'
+      original_url?: string  // 保留来源链接
     }> = []
 
     for (const cluster of clusters) {
@@ -502,7 +507,11 @@ export class TripService {
 
       for (let i = 0; i < sorted.length; i++) {
         const point = sorted[i]
-        optimizedRoute.push(point)
+        // 添加 original_url 到返回数据
+        optimizedRoute.push({
+          ...point,
+          original_url: (point as any).original_url
+        })
       }
     }
 
