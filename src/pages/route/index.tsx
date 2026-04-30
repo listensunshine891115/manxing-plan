@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, Image, Picker } from '@tarojs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -115,31 +115,6 @@ export default function Route() {
       query: `code=${shareCode}`
     }
   })
-  
-  // 分享链接给好友
-  const handleShareToFriend = useCallback(() => {
-    const shareUrl = `${PROJECT_DOMAIN || ''}/pages/route/index?code=${shareCode}`
-    const tripId = routePlan?.settings?.mainDestination || '漫行计划'
-    const days = routePlan?.settings?.days || 3
-    
-    Taro.showModal({
-      title: '分享路线给好友',
-      content: `${tripId} ${days}日游路线\n\n好友打开链接即可查看路线并参与投票！\n\n链接：${shareUrl}`,
-      confirmText: '复制链接',
-      cancelText: '关闭',
-      success: (res) => {
-        if (res.confirm) {
-          Taro.setClipboardData({
-            data: shareUrl,
-            success: () => {
-              Taro.showToast({ title: '链接已复制', icon: 'success' })
-            }
-          })
-        }
-      }
-    })
-  }, [shareCode, routePlan])
-  
   // 获取北京时间日期字符串 (格式: YYYY-MM-DD)
   const [voteSetting, setVoteSetting] = useState({
     startDate: '',
@@ -413,7 +388,8 @@ export default function Route() {
             </Button>
             <Text className="block text-lg font-semibold text-foreground ml-2">路线方案</Text>
           </View>
-          <Button variant="ghost" size="icon" onClick={handleShareToFriend}>
+          {/* 使用 open-type="share" 触发微信分享 */}
+          <Button variant="ghost" size="icon" open-type="share">
             <Share2 size={20} color="#3B82F6" />
           </Button>
         </View>
@@ -645,16 +621,26 @@ export default function Route() {
         }}
       >
         <View className="flex gap-3 mb-3">
-          <Button
-            variant={voteSession ? "outline" : "outline"}
-            className={`flex-1 h-12 ${voteSession ? 'border-green-500' : ''}`}
-            onClick={handleShareVote}
-          >
-            <Copy size={18} color={voteSession ? "#22C55E" : "#3B82F6"} className="mr-2" />
-            <Text style={{ color: voteSession ? '#22C55E' : '#3B82F6' }}>
-              {voteSession ? '分享投票' : '邀请投票'}
-            </Text>
-          </Button>
+          {/* 分享投票按钮 - 有投票会话时使用 open-type="share" 触发微信分享，否则先创建投票 */}
+          {voteSession ? (
+            <Button
+              variant="outline"
+              className="flex-1 h-12 border-green-500"
+              open-type="share"
+            >
+              <Copy size={18} color="#22C55E" className="mr-2" />
+              <Text style={{ color: '#22C55E' }}>分享投票</Text>
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="flex-1 h-12"
+              onClick={handleShareVote}
+            >
+              <Copy size={18} color="#3B82F6" className="mr-2" />
+              <Text style={{ color: '#3B82F6' }}>邀请投票</Text>
+            </Button>
+          )}
           <Button
             className="flex-1 h-12 text-base font-medium"
             onClick={handleConfirm}

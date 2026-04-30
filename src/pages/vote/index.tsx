@@ -72,6 +72,17 @@ export default function VotePage() {
     }
   }, [])
 
+  // 分享到微信好友
+  useShareAppMessage(() => {
+    const title = session?.title || '旅行路线投票'
+    const days = session?.inspirationPoints ? Math.ceil(session.inspirationPoints.length / 5) : 3
+    return {
+      title: `【漫行计划】${title} ${days}日游 - 请你来投票！`,
+      path: `/pages/vote/index?code=${shareCode}`,
+      imageUrl: session?.inspirationPoints?.[0]?.image || ''
+    }
+  })
+
   // 获取用户信息
   const getUserInfo = async () => {
     try {
